@@ -71,7 +71,7 @@ function openTemplates() {
           <p>Sizni hayotimizdagi eng baxtli kunimizga taklif qilamiz.</p>
 
           <div class="card-place">
-            <strong>WEDDING CEREMONY</strong>
+            <strong>Nikoh marosimi</strong>
             <span>Toshkent shahri</span>
           </div>
         </div>
