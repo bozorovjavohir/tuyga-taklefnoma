@@ -601,7 +601,7 @@ function openTemplates() {
 
   margin: 0 auto 70px;
 
-  padding: 45px;
+  padding: 40px;
 
   display: flex;
 
@@ -609,9 +609,10 @@ function openTemplates() {
 
   justify-content: space-between;
 
-  gap: 30px;
+  gap: 10px;
 
   border-radius: 25px;
+  box-sizing: border-box;
 
   background: linear-gradient(135deg, #fffaf5, #f5e6d9);
 
