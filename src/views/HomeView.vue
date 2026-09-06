@@ -631,6 +631,7 @@ function openTemplates() {
   font-size: 34px;
 
   font-weight: 400;
+  color: #b57b50;
 
   line-height: 1.2;
 }
