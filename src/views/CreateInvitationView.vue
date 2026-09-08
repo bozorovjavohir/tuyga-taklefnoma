@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { ref, nextTick } from "vue";
 import { storeToRefs } from "pinia";
 import { useInvitationStore } from "../stores/invitation";
 import { useRouter } from "vue-router";
@@ -25,40 +26,27 @@ const {
   tiktokUrl,
 } = storeToRefs(invitationStore);
 
-/*
-|--------------------------------------------------------------------------
-| LOCAL STORAGE
-|--------------------------------------------------------------------------
-*/
+// ============================================================
+// LOCAL STORAGE
+// ============================================================
 
 invitationStore.$subscribe(() => {
   invitationStore.save();
 });
 
-/*
-|--------------------------------------------------------------------------
-| TELEFON RAQAMI
-|--------------------------------------------------------------------------
-|
-| Format:
-| +998 90 123 45 67
-|
-| +998 dan keyin faqat 9 ta raqam.
-|--------------------------------------------------------------------------
-*/
+// ============================================================
+// TELEFON MASKASI
+// ============================================================
 
 function formatPhone(type: "groomPhone" | "bridePhone") {
   let value = invitationStore[type] || "";
 
-  // Faqat raqamlarni olamiz
   let digits = value.replace(/\D/g, "");
 
-  // Agar foydalanuvchi +998 yozsa, 998 ni olib tashlaymiz
   if (digits.startsWith("998")) {
     digits = digits.slice(3);
   }
 
-  // +998 dan keyin faqat 9 ta raqam
   digits = digits.slice(0, 9);
 
   let formatted = "+998";
@@ -82,11 +70,9 @@ function formatPhone(type: "groomPhone" | "bridePhone") {
   invitationStore[type] = formatted;
 }
 
-/*
-|--------------------------------------------------------------------------
-| TELEFON VALIDATSIYA
-|--------------------------------------------------------------------------
-*/
+// ============================================================
+// TELEFON VALIDATSIYA
+// ============================================================
 
 function isValidPhone(phone: string) {
   if (!phone) {
@@ -98,11 +84,185 @@ function isValidPhone(phone: string) {
   return digits.length === 12 && digits.startsWith("998");
 }
 
-/*
-|--------------------------------------------------------------------------
-| ASOSIY FOTO
-|--------------------------------------------------------------------------
-*/
+// ============================================================
+// RASM TAHRIRLASH
+// ============================================================
+
+const showImageEditor = ref(false);
+
+const imageEditorUrl = ref("");
+
+const editorImage = ref<HTMLImageElement | null>(null);
+
+const editorCanvas = ref<HTMLCanvasElement | null>(null);
+
+const zoom = ref(1);
+
+const imageX = ref(0);
+
+const imageY = ref(0);
+
+const isDragging = ref(false);
+
+const CANVAS_SIZE = 360;
+
+let dragStartX = 0;
+let dragStartY = 0;
+
+let startImageX = 0;
+let startImageY = 0;
+
+// ============================================================
+// EDITOR RASM CHIZISH
+// ============================================================
+
+function drawEditorImage() {
+  const canvas = editorCanvas.value;
+  const img = editorImage.value;
+
+  if (!canvas || !img) {
+    return;
+  }
+
+  const ctx = canvas.getContext("2d");
+
+  if (!ctx) {
+    return;
+  }
+
+  const baseScale = Math.max(
+    CANVAS_SIZE / img.naturalWidth,
+    CANVAS_SIZE / img.naturalHeight
+  );
+
+  const scale = baseScale * zoom.value;
+
+  const width = img.naturalWidth * scale;
+  const height = img.naturalHeight * scale;
+
+  const baseX = (CANVAS_SIZE - width) / 2;
+  const baseY = (CANVAS_SIZE - height) / 2;
+
+  const x = baseX + imageX.value;
+  const y = baseY + imageY.value;
+
+  ctx.clearRect(0, 0, CANVAS_SIZE, CANVAS_SIZE);
+
+  ctx.fillStyle = "#ffffff";
+
+  ctx.fillRect(0, 0, CANVAS_SIZE, CANVAS_SIZE);
+
+  ctx.drawImage(img, x, y, width, height);
+}
+
+// ============================================================
+// RASM POZITSIYASINI CHEGARALASH
+// ============================================================
+
+function clampImagePosition() {
+  const img = editorImage.value;
+
+  if (!img) {
+    return;
+  }
+
+  const baseScale = Math.max(
+    CANVAS_SIZE / img.naturalWidth,
+    CANVAS_SIZE / img.naturalHeight
+  );
+
+  const scale = baseScale * zoom.value;
+
+  const width = img.naturalWidth * scale;
+  const height = img.naturalHeight * scale;
+
+  const baseX = (CANVAS_SIZE - width) / 2;
+  const baseY = (CANVAS_SIZE - height) / 2;
+
+  const minX = CANVAS_SIZE - width - baseX;
+  const maxX = -baseX;
+
+  const minY = CANVAS_SIZE - height - baseY;
+  const maxY = -baseY;
+
+  imageX.value = Math.min(maxX, Math.max(minX, imageX.value));
+
+  imageY.value = Math.min(maxY, Math.max(minY, imageY.value));
+}
+
+// ============================================================
+// ZOOM
+// ============================================================
+
+function setZoom(value: number) {
+  zoom.value = Math.min(3, Math.max(1, value));
+
+  clampImagePosition();
+
+  drawEditorImage();
+}
+
+function zoomIn() {
+  setZoom(Number((zoom.value + 0.1).toFixed(2)));
+}
+
+function zoomOut() {
+  setZoom(Number((zoom.value - 0.1).toFixed(2)));
+}
+
+// ============================================================
+// RESET
+// ============================================================
+
+function resetEditor() {
+  zoom.value = 1;
+
+  imageX.value = 0;
+  imageY.value = 0;
+
+  clampImagePosition();
+
+  drawEditorImage();
+}
+
+// ============================================================
+// RASM EDITORNI OCHISH
+// ============================================================
+
+async function openImageEditor(url: string) {
+  imageEditorUrl.value = url;
+
+  showImageEditor.value = true;
+
+  zoom.value = 1;
+
+  imageX.value = 0;
+  imageY.value = 0;
+
+  editorImage.value = null;
+
+  await nextTick();
+
+  const img = new Image();
+
+  img.onload = () => {
+    editorImage.value = img;
+
+    drawEditorImage();
+  };
+
+  img.onerror = () => {
+    alert("Rasmni yuklashda xatolik yuz berdi.");
+
+    closeImageEditor();
+  };
+
+  img.src = url;
+}
+
+// ============================================================
+// RASM UPLOAD
+// ============================================================
 
 function handleMainPhoto(event: Event) {
   const target = event.target as HTMLInputElement;
@@ -121,12 +281,20 @@ function handleMainPhoto(event: Event) {
     return;
   }
 
+  if (!file.type.startsWith("image/")) {
+    alert("Iltimos, faqat rasm faylini tanlang.");
+
+    target.value = "";
+
+    return;
+  }
+
   const reader = new FileReader();
 
   reader.onload = () => {
-    mainPhoto.value = reader.result as string;
+    const imageUrl = reader.result as string;
 
-    invitationStore.save();
+    openImageEditor(imageUrl);
   };
 
   reader.onerror = () => {
@@ -134,36 +302,144 @@ function handleMainPhoto(event: Event) {
   };
 
   reader.readAsDataURL(file);
+
+  // Keyingi safar aynan shu faylni ham qayta tanlashga ruxsat
+  target.value = "";
 }
 
-/*
-|--------------------------------------------------------------------------
-| VALIDATSIYA
-|--------------------------------------------------------------------------
-*/
+// ============================================================
+// MAVJUD RASMNI TAHRIRLASH
+// ============================================================
+
+function editCurrentPhoto() {
+  if (!mainPhoto.value) {
+    return;
+  }
+
+  openImageEditor(mainPhoto.value);
+}
+
+// ============================================================
+// DRAG
+// ============================================================
+
+function startDrag(event: PointerEvent) {
+  if (!editorImage.value) {
+    return;
+  }
+
+  isDragging.value = true;
+
+  dragStartX = event.clientX;
+  dragStartY = event.clientY;
+
+  startImageX = imageX.value;
+  startImageY = imageY.value;
+
+  const canvas = editorCanvas.value;
+
+  if (canvas) {
+    canvas.setPointerCapture(event.pointerId);
+  }
+}
+
+function dragImage(event: PointerEvent) {
+  if (!isDragging.value) {
+    return;
+  }
+
+  const canvas = editorCanvas.value;
+
+  if (!canvas) {
+    return;
+  }
+
+  const rect = canvas.getBoundingClientRect();
+
+  const scaleX = CANVAS_SIZE / rect.width;
+  const scaleY = CANVAS_SIZE / rect.height;
+
+  imageX.value = startImageX + (event.clientX - dragStartX) * scaleX;
+
+  imageY.value = startImageY + (event.clientY - dragStartY) * scaleY;
+
+  clampImagePosition();
+
+  drawEditorImage();
+}
+
+function stopDrag() {
+  isDragging.value = false;
+}
+
+// ============================================================
+// EDITORNI SAQLASH
+// ============================================================
+
+function saveImageEdit() {
+  const canvas = editorCanvas.value;
+
+  if (!canvas || !editorImage.value) {
+    return;
+  }
+
+  clampImagePosition();
+
+  drawEditorImage();
+
+  // Rasmni siqib, LocalStorage uchun qulay hajmda saqlaymiz
+  const result = canvas.toDataURL("image/jpeg", 0.9);
+
+  mainPhoto.value = result;
+
+  invitationStore.save();
+
+  closeImageEditor();
+}
+
+// ============================================================
+// EDITORNI YOPISH
+// ============================================================
+
+function closeImageEditor() {
+  showImageEditor.value = false;
+
+  imageEditorUrl.value = "";
+
+  editorImage.value = null;
+
+  isDragging.value = false;
+}
+
+// ============================================================
+// VALIDATSIYA
+// ============================================================
 
 function validateForm() {
   if (!groomName.value.trim()) {
     alert("Iltimos, kuyovning ismini kiriting.");
+
     return false;
   }
 
   if (!brideName.value.trim()) {
     alert("Iltimos, kelinning ismini kiriting.");
+
     return false;
   }
 
   if (!weddingDate.value) {
     alert("Iltimos, to‘y sanasini kiriting.");
+
     return false;
   }
 
   if (!venueName.value.trim()) {
     alert("Iltimos, to‘y joyini kiriting.");
+
     return false;
   }
 
-  // Kuyov telefoni noto'g'ri bo'lsa
   if (groomPhone.value && !isValidPhone(groomPhone.value)) {
     alert(
       "Kuyov telefon raqami +998 dan keyin 9 ta raqamdan iborat bo‘lishi kerak."
@@ -172,7 +448,6 @@ function validateForm() {
     return false;
   }
 
-  // Kelin telefoni noto'g'ri bo'lsa
   if (bridePhone.value && !isValidPhone(bridePhone.value)) {
     alert(
       "Kelin telefon raqami +998 dan keyin 9 ta raqamdan iborat bo‘lishi kerak."
@@ -184,11 +459,9 @@ function validateForm() {
   return true;
 }
 
-/*
-|--------------------------------------------------------------------------
-| DAVOM ETISH
-|--------------------------------------------------------------------------
-*/
+// ============================================================
+// DAVOM ETISH
+// ============================================================
 
 async function continueToTemplates() {
   if (!validateForm()) {
@@ -202,6 +475,7 @@ async function continueToTemplates() {
   try {
     if (button) {
       button.disabled = true;
+
       button.textContent = "Saqlanmoqda...";
     }
 
@@ -219,6 +493,7 @@ async function continueToTemplates() {
 
     if (button) {
       button.disabled = false;
+
       button.textContent = "Taklifnomani davom ettirish";
     }
   }
