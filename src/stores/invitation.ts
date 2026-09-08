@@ -32,6 +32,7 @@ export interface Invitation {
 }
 
 const STORAGE_KEY = "taklifnoma";
+const SESSION_KEY = "taklifnoma_session";
 
 const defaultInvitation: Invitation = {
   template: "elegant",
@@ -75,6 +76,9 @@ export const useInvitationStore = defineStore("invitation", {
     save() {
       try {
         localStorage.setItem(STORAGE_KEY, JSON.stringify(this.$state));
+
+        // Joriy brauzer sessiyasi faol ekanini belgilaymiz
+        sessionStorage.setItem(SESSION_KEY, "active");
       } catch (error) {
         console.error("Taklifnoma LocalStorage'ga saqlanmadi:", error);
       }
@@ -82,9 +86,37 @@ export const useInvitationStore = defineStore("invitation", {
 
     /**
      * LocalStorage'dan yuklash
+     *
+     * Muhim:
+     * Agar yangi brauzer sessiyasi boshlangan bo'lsa,
+     * eski taklifnomani yuklamaymiz.
      */
     load() {
       try {
+        const currentSession = sessionStorage.getItem(SESSION_KEY);
+
+        /**
+         * Agar bu yangi sessiya bo'lsa:
+         *
+         * LocalStorage'dagi eski ma'lumotlarni o'chiramiz.
+         */
+        if (!currentSession) {
+          localStorage.removeItem(STORAGE_KEY);
+
+          Object.assign(this.$state, {
+            ...defaultInvitation,
+            gallery: [],
+          });
+
+          sessionStorage.setItem(SESSION_KEY, "active");
+
+          return;
+        }
+
+        /**
+         * Shu sessiya ichida F5 bo'lsa,
+         * eski ma'lumotlarni qayta yuklaymiz.
+         */
         const saved = localStorage.getItem(STORAGE_KEY);
 
         if (!saved) {
@@ -105,8 +137,7 @@ export const useInvitationStore = defineStore("invitation", {
         });
 
         /**
-         * Noto‘g‘ri template bo‘lsa
-         * elegant ishlatiladi
+         * Template tekshirish
          */
         const templates: InvitationTemplate[] = [
           "elegant",
@@ -127,7 +158,7 @@ export const useInvitationStore = defineStore("invitation", {
     },
 
     /**
-     * Shablonni almashtirish
+     * Template almashtirish
      */
     setTemplate(template: InvitationTemplate) {
       this.template = template;
@@ -135,7 +166,13 @@ export const useInvitationStore = defineStore("invitation", {
     },
 
     /**
-     * Barcha ma'lumotlarni tozalash
+     * Yangi taklifnoma
+     *
+     * Eski ma'lumotlar:
+     * - Pinia'dan
+     * - LocalStorage'dan
+     *
+     * to'liq o'chiriladi.
      */
     reset() {
       Object.assign(this.$state, {
@@ -144,6 +181,12 @@ export const useInvitationStore = defineStore("invitation", {
       });
 
       localStorage.removeItem(STORAGE_KEY);
+
+      /**
+       * Sessiya davom etadi.
+       * Yangi forma ochiladi.
+       */
+      sessionStorage.setItem(SESSION_KEY, "active");
     },
   },
 });
