@@ -31,7 +31,11 @@ const {
 // ============================================================
 
 invitationStore.$subscribe(() => {
-  invitationStore.save();
+  try {
+    invitationStore.save();
+  } catch (error) {
+    console.error("LocalStorage saqlashda xatolik:", error);
+  }
 });
 
 // ============================================================
@@ -85,12 +89,10 @@ function isValidPhone(phone: string) {
 }
 
 // ============================================================
-// RASM TAHRIRLASH
+// RASM EDITOR
 // ============================================================
 
 const showImageEditor = ref(false);
-
-const imageEditorUrl = ref("");
 
 const editorImage = ref<HTMLImageElement | null>(null);
 
@@ -104,7 +106,9 @@ const imageY = ref(0);
 
 const isDragging = ref(false);
 
-const CANVAS_SIZE = 360;
+// 300x300 qilib saqlaymiz.
+// Bu LocalStorage uchun ancha yengil.
+const CANVAS_SIZE = 300;
 
 let dragStartX = 0;
 let dragStartY = 0;
@@ -152,11 +156,14 @@ function drawEditorImage() {
 
   ctx.fillRect(0, 0, CANVAS_SIZE, CANVAS_SIZE);
 
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = "high";
+
   ctx.drawImage(img, x, y, width, height);
 }
 
 // ============================================================
-// RASM POZITSIYASINI CHEGARALASH
+// RASMNI CHEGARADA USHLASH
 // ============================================================
 
 function clampImagePosition() {
@@ -180,9 +187,11 @@ function clampImagePosition() {
   const baseY = (CANVAS_SIZE - height) / 2;
 
   const minX = CANVAS_SIZE - width - baseX;
+
   const maxX = -baseX;
 
   const minY = CANVAS_SIZE - height - baseY;
+
   const maxY = -baseY;
 
   imageX.value = Math.min(maxX, Math.max(minX, imageX.value));
@@ -226,11 +235,13 @@ function resetEditor() {
 }
 
 // ============================================================
-// RASM EDITORNI OCHISH
+// EDITORNI OCHISH
 // ============================================================
 
 async function openImageEditor(url: string) {
-  imageEditorUrl.value = url;
+  if (!url) {
+    return;
+  }
 
   showImageEditor.value = true;
 
@@ -261,7 +272,7 @@ async function openImageEditor(url: string) {
 }
 
 // ============================================================
-// RASM UPLOAD
+// ASOSIY RASMNI YUKLASH
 // ============================================================
 
 function handleMainPhoto(event: Event) {
@@ -273,6 +284,7 @@ function handleMainPhoto(event: Event) {
 
   const file = target.files[0];
 
+  // 2 MB limit
   if (file.size > 2 * 1024 * 1024) {
     alert("Rasm hajmi 2 MB dan kichik bo‘lishi kerak.");
 
@@ -281,6 +293,7 @@ function handleMainPhoto(event: Event) {
     return;
   }
 
+  // Faqat rasm
   if (!file.type.startsWith("image/")) {
     alert("Iltimos, faqat rasm faylini tanlang.");
 
@@ -294,6 +307,8 @@ function handleMainPhoto(event: Event) {
   reader.onload = () => {
     const imageUrl = reader.result as string;
 
+    // Rasmni darhol mainPhoto ga yozmaymiz.
+    // Avval editor orqali tayyorlaymiz.
     openImageEditor(imageUrl);
   };
 
@@ -303,7 +318,7 @@ function handleMainPhoto(event: Event) {
 
   reader.readAsDataURL(file);
 
-  // Keyingi safar aynan shu faylni ham qayta tanlashga ruxsat
+  // Shu faylni qayta tanlashga ham ruxsat
   target.value = "";
 }
 
@@ -320,7 +335,7 @@ function editCurrentPhoto() {
 }
 
 // ============================================================
-// DRAG
+// DRAG BOSHLASH
 // ============================================================
 
 function startDrag(event: PointerEvent) {
@@ -339,9 +354,17 @@ function startDrag(event: PointerEvent) {
   const canvas = editorCanvas.value;
 
   if (canvas) {
-    canvas.setPointerCapture(event.pointerId);
+    try {
+      canvas.setPointerCapture(event.pointerId);
+    } catch {
+      // Ba'zi brauzerlarda kerak emas
+    }
   }
 }
+
+// ============================================================
+// DRAG
+// ============================================================
 
 function dragImage(event: PointerEvent) {
   if (!isDragging.value) {
@@ -356,7 +379,12 @@ function dragImage(event: PointerEvent) {
 
   const rect = canvas.getBoundingClientRect();
 
+  if (!rect.width || !rect.height) {
+    return;
+  }
+
   const scaleX = CANVAS_SIZE / rect.width;
+
   const scaleY = CANVAS_SIZE / rect.height;
 
   imageX.value = startImageX + (event.clientX - dragStartX) * scaleX;
@@ -368,33 +396,90 @@ function dragImage(event: PointerEvent) {
   drawEditorImage();
 }
 
+// ============================================================
+// DRAG TO‘XTATISH
+// ============================================================
+
 function stopDrag() {
   isDragging.value = false;
 }
 
 // ============================================================
-// EDITORNI SAQLASH
+// RASMNI SAQLASH
 // ============================================================
 
 function saveImageEdit() {
   const canvas = editorCanvas.value;
 
-  if (!canvas || !editorImage.value) {
+  const img = editorImage.value;
+
+  if (!canvas || !img) {
+    alert("Rasm hali tayyor emas. Iltimos, biroz kuting.");
+
     return;
   }
 
-  clampImagePosition();
+  try {
+    clampImagePosition();
 
-  drawEditorImage();
+    drawEditorImage();
 
-  // Rasmni siqib, LocalStorage uchun qulay hajmda saqlaymiz
-  const result = canvas.toDataURL("image/jpeg", 0.9);
+    /*
+     * JPEG sifatini 0.75 qilib saqlaymiz.
+     * Bu LocalStorage hajmini ancha kamaytiradi.
+     */
+    const result = canvas.toDataURL("image/jpeg", 0.75);
 
-  mainPhoto.value = result;
+    if (!result || result.length < 100) {
+      alert("Rasmni tayyorlashda xatolik yuz berdi.");
 
-  invitationStore.save();
+      return;
+    }
 
-  closeImageEditor();
+    /*
+     * MUHIM:
+     * Rasmni Pinia store'ga yozamiz.
+     */
+    mainPhoto.value = result;
+
+    /*
+     * LocalStorage'ga saqlaymiz.
+     */
+    try {
+      invitationStore.save();
+    } catch (storageError) {
+      console.error("LocalStorage xatosi:", storageError);
+
+      /*
+       * Agar LocalStorage to‘lib qolgan bo‘lsa,
+       * rasmni yana kichraytirib ko‘ramiz.
+       */
+      try {
+        const smallerResult = canvas.toDataURL("image/jpeg", 0.55);
+
+        mainPhoto.value = smallerResult;
+
+        invitationStore.save();
+      } catch (secondError) {
+        console.error("Qayta saqlash ham xato:", secondError);
+
+        mainPhoto.value = "";
+
+        alert(
+          "Rasmni saqlab bo‘lmadi. LocalStorage xotirasi to‘lgan bo‘lishi mumkin."
+        );
+
+        return;
+      }
+    }
+
+    // Editor yopiladi
+    closeImageEditor();
+  } catch (error) {
+    console.error("Rasmni saqlashda xatolik:", error);
+
+    alert("Rasmni saqlashda xatolik yuz berdi.");
+  }
 }
 
 // ============================================================
@@ -404,15 +489,13 @@ function saveImageEdit() {
 function closeImageEditor() {
   showImageEditor.value = false;
 
-  imageEditorUrl.value = "";
-
   editorImage.value = null;
 
   isDragging.value = false;
 }
 
 // ============================================================
-// VALIDATSIYA
+// FORM VALIDATSIYA
 // ============================================================
 
 function validateForm() {
@@ -502,6 +585,10 @@ async function continueToTemplates() {
 
 <template>
   <main class="create-page">
+    <!-- =====================================================
+         HEADER
+    ====================================================== -->
+
     <div class="page-header">
       <p>TAKLIFNOMA YARATISH</p>
 
@@ -515,24 +602,33 @@ async function continueToTemplates() {
       </div>
     </div>
 
+    <!-- =====================================================
+         MAIN
+    ====================================================== -->
+
     <section class="form-wrapper">
+      <!-- ===================================================
+           FORM
+      ==================================================== -->
+
       <form class="form" @submit.prevent>
-        <!-- =====================================================
+        <!-- =================================================
              01
-        ====================================================== -->
+        ================================================== -->
 
         <div class="section-title">
           <span>01</span>
 
           <div>
             <h2>Kuyov va kelin</h2>
+
             <p>Ismlarni kiriting</p>
           </div>
         </div>
 
         <div class="fields">
           <div class="field">
-            <label>Kuyovning ismi</label>
+            <label> Kuyovning ismi </label>
 
             <input
               v-model="groomName"
@@ -542,7 +638,7 @@ async function continueToTemplates() {
           </div>
 
           <div class="field">
-            <label>Kelinning ismi</label>
+            <label> Kelinning ismi </label>
 
             <input
               v-model="brideName"
@@ -552,15 +648,16 @@ async function continueToTemplates() {
           </div>
         </div>
 
-        <!-- =====================================================
-             02
-        ====================================================== -->
+        <!-- =================================================
+             02 FOTO
+        ================================================== -->
 
         <div class="section-title">
           <span>02</span>
 
           <div>
             <h2>Asosiy foto</h2>
+
             <p>Kuyov va kelinning asosiy rasmini yuklang</p>
           </div>
         </div>
@@ -569,54 +666,67 @@ async function continueToTemplates() {
           <label class="upload-box">
             <input type="file" accept="image/*" @change="handleMainPhoto" />
 
-            <span v-if="!mainPhoto">📷 Rasm tanlash</span>
+            <span v-if="!mainPhoto"> 📷 Rasm tanlash </span>
 
             <img v-else :src="mainPhoto" alt="Asosiy foto" />
           </label>
+
+          <!-- Rasm tahrirlash -->
+
+          <button
+            v-if="mainPhoto"
+            type="button"
+            class="edit-photo-button"
+            @click="editCurrentPhoto"
+          >
+            ✏️ Rasmni tahrirlash
+          </button>
         </div>
 
-        <!-- =====================================================
+        <!-- =================================================
              03
-        ====================================================== -->
+        ================================================== -->
 
         <div class="section-title">
           <span>03</span>
 
           <div>
             <h2>To‘y sanasi</h2>
+
             <p>To‘y qachon bo‘ladi?</p>
           </div>
         </div>
 
         <div class="fields date-fields">
           <div class="field">
-            <label>Sana</label>
+            <label> Sana </label>
 
             <input v-model="weddingDate" type="date" class="date-input" />
           </div>
 
           <div class="field">
-            <label>Boshlanish vaqti</label>
+            <label> Boshlanish vaqti </label>
 
             <input v-model="weddingTime" type="time" class="time-input" />
           </div>
         </div>
 
-        <!-- =====================================================
+        <!-- =================================================
              04
-        ====================================================== -->
+        ================================================== -->
 
         <div class="section-title">
           <span>04</span>
 
           <div>
             <h2>To‘y manzili</h2>
+
             <p>Mehmonlar qayerga kelishadi?</p>
           </div>
         </div>
 
         <div class="field">
-          <label>To‘y joyi</label>
+          <label> To‘y joyi </label>
 
           <input
             v-model="venueName"
@@ -626,7 +736,7 @@ async function continueToTemplates() {
         </div>
 
         <div class="field">
-          <label>Manzil</label>
+          <label> Manzil </label>
 
           <input
             v-model="address"
@@ -636,7 +746,7 @@ async function continueToTemplates() {
         </div>
 
         <div class="field">
-          <label>Google Maps havolasi</label>
+          <label> Google Maps havolasi </label>
 
           <input
             v-model="googleMapsUrl"
@@ -646,7 +756,7 @@ async function continueToTemplates() {
         </div>
 
         <div class="field">
-          <label>Yandex Maps havolasi</label>
+          <label> Yandex Maps havolasi </label>
 
           <input
             v-model="yandexMapsUrl"
@@ -655,22 +765,23 @@ async function continueToTemplates() {
           />
         </div>
 
-        <!-- =====================================================
+        <!-- =================================================
              05
-        ====================================================== -->
+        ================================================== -->
 
         <div class="section-title">
           <span>05</span>
 
           <div>
             <h2>Aloqa</h2>
+
             <p>Mehmonlar siz bilan bog‘lanishi uchun</p>
           </div>
         </div>
 
         <div class="fields">
           <div class="field">
-            <label>Kuyov telefoni</label>
+            <label> Kuyov telefoni </label>
 
             <input
               v-model="groomPhone"
@@ -684,7 +795,7 @@ async function continueToTemplates() {
           </div>
 
           <div class="field">
-            <label>Kelin telefoni</label>
+            <label> Kelin telefoni </label>
 
             <input
               v-model="bridePhone"
@@ -698,21 +809,22 @@ async function continueToTemplates() {
           </div>
         </div>
 
-        <!-- =====================================================
+        <!-- =================================================
              06
-        ====================================================== -->
+        ================================================== -->
 
         <div class="section-title">
           <span>06</span>
 
           <div>
             <h2>Ijtimoiy tarmoqlar</h2>
+
             <p>Ixtiyoriy</p>
           </div>
         </div>
 
         <div class="field">
-          <label>Instagram</label>
+          <label> Instagram </label>
 
           <input
             v-model="instagramUrl"
@@ -722,7 +834,7 @@ async function continueToTemplates() {
         </div>
 
         <div class="field">
-          <label>Telegram</label>
+          <label> Telegram </label>
 
           <input
             v-model="telegramUrl"
@@ -732,7 +844,7 @@ async function continueToTemplates() {
         </div>
 
         <div class="field">
-          <label>Facebook</label>
+          <label> Facebook </label>
 
           <input
             v-model="facebookUrl"
@@ -742,7 +854,7 @@ async function continueToTemplates() {
         </div>
 
         <div class="field">
-          <label>TikTok</label>
+          <label> TikTok </label>
 
           <input
             v-model="tiktokUrl"
@@ -751,21 +863,22 @@ async function continueToTemplates() {
           />
         </div>
 
-        <!-- =====================================================
+        <!-- =================================================
              07
-        ====================================================== -->
+        ================================================== -->
 
         <div class="section-title">
           <span>07</span>
 
           <div>
             <h2>Taklifnoma matni</h2>
+
             <p>Mehmonlarga aytmoqchi bo‘lgan so‘zlaringiz</p>
           </div>
         </div>
 
         <div class="field">
-          <label>Tabrik / taklif matni</label>
+          <label> Tabrik / taklif matni </label>
 
           <textarea
             v-model="message"
@@ -773,6 +886,8 @@ async function continueToTemplates() {
             placeholder="Sizni hayotimizdagi eng baxtli kunimizga taklif qilamiz..."
           ></textarea>
         </div>
+
+        <!-- SUBMIT -->
 
         <button
           type="button"
@@ -783,9 +898,119 @@ async function continueToTemplates() {
         </button>
       </form>
 
-      <!-- =====================================================
+      <!-- ===================================================
+           RASM EDITOR
+      ==================================================== -->
+
+      <div
+        v-if="showImageEditor"
+        class="image-editor-overlay"
+        @click.self="closeImageEditor"
+      >
+        <div class="image-editor-modal" role="dialog" aria-modal="true">
+          <!-- HEADER -->
+
+          <div class="image-editor-header">
+            <div>
+              <strong> Rasmni tahrirlash </strong>
+
+              <span> Rasmni suring va kerakli joyga joylashtiring </span>
+            </div>
+
+            <button
+              type="button"
+              class="editor-close"
+              @click="closeImageEditor"
+            >
+              ×
+            </button>
+          </div>
+
+          <!-- WORKSPACE -->
+
+          <div class="image-editor-workspace">
+            <!-- CANVAS -->
+
+            <div class="editor-canvas-wrap">
+              <canvas
+                ref="editorCanvas"
+                :width="CANVAS_SIZE"
+                :height="CANVAS_SIZE"
+                class="editor-canvas"
+                :class="{
+                  dragging: isDragging,
+                }"
+                @pointerdown="startDrag"
+                @pointermove="dragImage"
+                @pointerup="stopDrag"
+                @pointercancel="stopDrag"
+              ></canvas>
+
+              <!-- Dumaloq crop -->
+
+              <div class="editor-crop-circle"></div>
+            </div>
+
+            <!-- HINT -->
+
+            <p class="editor-hint">
+              🖱️ Rasmni sichqoncha yoki barmoq bilan suring
+            </p>
+
+            <!-- ZOOM -->
+
+            <div class="zoom-row">
+              <button type="button" class="zoom-button" @click="zoomOut">
+                −
+              </button>
+
+              <input
+                :value="zoom"
+                type="range"
+                min="1"
+                max="3"
+                step="0.05"
+                class="zoom-range"
+                @input="
+                  setZoom(Number(($event.target as HTMLInputElement).value))
+                "
+              />
+
+              <button type="button" class="zoom-button" @click="zoomIn">
+                +
+              </button>
+            </div>
+
+            <!-- ZOOM FOIZ -->
+
+            <div class="zoom-value">{{ Math.round(zoom * 100) }}%</div>
+
+            <!-- BUTTONS -->
+
+            <div class="editor-actions">
+              <button type="button" class="editor-reset" @click="resetEditor">
+                ↺ Qayta
+              </button>
+
+              <button
+                type="button"
+                class="editor-cancel"
+                @click="closeImageEditor"
+              >
+                Bekor qilish
+              </button>
+
+              <button type="button" class="editor-save" @click="saveImageEdit">
+                ✓ Saqlash
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ===================================================
            PREVIEW
-      ====================================================== -->
+      ==================================================== -->
 
       <aside class="preview">
         <p>OLDINDAN KO‘RISH</p>
@@ -888,6 +1113,7 @@ async function continueToTemplates() {
   font-size: clamp(40px, 6vw, 70px);
 
   line-height: 1.05;
+
   font-weight: 400;
 
   color: #292522;
@@ -906,6 +1132,7 @@ async function continueToTemplates() {
   color: #85807b;
 
   font-size: 16px;
+
   line-height: 1.7;
 }
 
@@ -995,6 +1222,7 @@ async function continueToTemplates() {
   color: #b57b50;
 
   font-size: 13px;
+
   font-weight: 800;
 }
 
@@ -1008,6 +1236,7 @@ async function continueToTemplates() {
   font-family: Georgia, "Times New Roman", serif;
 
   font-size: 22px;
+
   font-weight: 400;
 
   color: #302a26;
@@ -1057,6 +1286,7 @@ async function continueToTemplates() {
   color: #514a45;
 
   font-size: 13px;
+
   font-weight: 700;
 }
 
@@ -1133,12 +1363,12 @@ async function continueToTemplates() {
   color: #332e2a;
 }
 
-.field input[type="date"]::-webkit-date-and-time-value {
+.field input[type="date"] ::-webkit-date-and-time-value {
   text-align: left;
 }
 
-.field input[type="date"]::-webkit-calendar-picker-indicator,
-.field input[type="time"]::-webkit-calendar-picker-indicator {
+.field input[type="date"] ::-webkit-calendar-picker-indicator,
+.field input[type="time"] ::-webkit-calendar-picker-indicator {
   cursor: pointer;
 }
 
@@ -1202,6 +1432,7 @@ async function continueToTemplates() {
   color: #b57b50;
 
   font-size: 14px;
+
   font-weight: 700;
 
   text-align: center;
@@ -1219,7 +1450,51 @@ async function continueToTemplates() {
 }
 
 /* =========================================================
-   BUTTON
+   EDIT PHOTO BUTTON
+========================================================= */
+
+.edit-photo-button {
+  display: block;
+
+  width: 100%;
+
+  margin-top: 12px;
+
+  padding: 13px 18px;
+
+  border: 1px solid #d8c3b2;
+
+  border-radius: 12px;
+
+  background: #fffaf6;
+
+  color: #a97045;
+
+  font-family: inherit;
+
+  font-size: 14px;
+
+  font-weight: 800;
+
+  cursor: pointer;
+
+  transition: background 0.2s, border-color 0.2s, transform 0.2s;
+}
+
+.edit-photo-button:hover {
+  background: #fff2e8;
+
+  border-color: #b57b50;
+
+  transform: translateY(-1px);
+}
+
+.edit-photo-button:active {
+  transform: translateY(0);
+}
+
+/* =========================================================
+   SUBMIT BUTTON
 ========================================================= */
 
 .submit-button {
@@ -1241,6 +1516,7 @@ async function continueToTemplates() {
   color: white;
 
   font-size: 15px;
+
   font-weight: 800;
 
   cursor: pointer;
@@ -1293,6 +1569,7 @@ async function continueToTemplates() {
   color: #b57b50;
 
   font-size: 11px;
+
   font-weight: 800;
 
   letter-spacing: 3px;
@@ -1301,7 +1578,7 @@ async function continueToTemplates() {
 }
 
 /* =========================================================
-   PHONE PREVIEW
+   PREVIEW CARD
 ========================================================= */
 
 .preview-card {
@@ -1320,6 +1597,7 @@ async function continueToTemplates() {
   flex-direction: column;
 
   align-items: center;
+
   justify-content: center;
 
   text-align: center;
@@ -1334,8 +1612,6 @@ async function continueToTemplates() {
 
   overflow: hidden;
 }
-
-/* Telefon yuqorisidagi kamera */
 
 .preview-card::before {
   content: "";
@@ -1375,7 +1651,7 @@ async function continueToTemplates() {
 }
 
 /* =========================================================
-   PREVIEW HEART
+   HEART
 ========================================================= */
 
 .rings {
@@ -1387,7 +1663,7 @@ async function continueToTemplates() {
 }
 
 /* =========================================================
-   PREVIEW NAME
+   NAME
 ========================================================= */
 
 .preview-card h2 {
@@ -1398,6 +1674,7 @@ async function continueToTemplates() {
   font-family: Georgia, "Times New Roman", serif;
 
   font-size: 28px;
+
   line-height: 1.25;
 
   font-weight: 400;
@@ -1442,6 +1719,350 @@ async function continueToTemplates() {
   color: #4a4039 !important;
 
   font-weight: 800;
+}
+
+/* =========================================================
+   IMAGE EDITOR OVERLAY
+========================================================= */
+
+.image-editor-overlay {
+  position: fixed;
+
+  inset: 0;
+
+  z-index: 9999;
+
+  display: flex;
+
+  align-items: center;
+
+  justify-content: center;
+
+  padding: 20px;
+
+  background: rgba(25, 20, 16, 0.78);
+
+  backdrop-filter: blur(6px);
+
+  -webkit-backdrop-filter: blur(6px);
+}
+
+/* =========================================================
+   EDITOR MODAL
+========================================================= */
+
+.image-editor-modal {
+  width: min(500px, 100%);
+
+  max-height: calc(100vh - 30px);
+
+  overflow-y: auto;
+
+  background: #ffffff;
+
+  border-radius: 24px;
+
+  box-shadow: 0 30px 100px rgba(0, 0, 0, 0.35);
+}
+
+/* =========================================================
+   EDITOR HEADER
+========================================================= */
+
+.image-editor-header {
+  display: flex;
+
+  align-items: center;
+
+  justify-content: space-between;
+
+  gap: 15px;
+
+  padding: 18px 20px;
+
+  border-bottom: 1px solid #eee7e1;
+}
+
+.image-editor-header > div {
+  min-width: 0;
+
+  display: flex;
+
+  flex-direction: column;
+
+  gap: 5px;
+}
+
+.image-editor-header strong {
+  color: #302a26;
+
+  font-family: Georgia, "Times New Roman", serif;
+
+  font-size: 21px;
+
+  font-weight: 400;
+}
+
+.image-editor-header span {
+  color: #98918b;
+
+  font-size: 12px;
+
+  line-height: 1.4;
+}
+
+.editor-close {
+  flex: 0 0 auto;
+
+  width: 38px;
+  height: 38px;
+
+  display: flex;
+
+  align-items: center;
+  justify-content: center;
+
+  padding: 0;
+
+  border: 0;
+
+  border-radius: 50%;
+
+  background: #f5f1ed;
+
+  color: #5d5149;
+
+  font-size: 26px;
+
+  line-height: 1;
+
+  cursor: pointer;
+}
+
+.editor-close:hover {
+  background: #eee5de;
+}
+
+/* =========================================================
+   EDITOR WORKSPACE
+========================================================= */
+
+.image-editor-workspace {
+  padding: 20px;
+
+  text-align: center;
+}
+
+/* =========================================================
+   CANVAS
+========================================================= */
+
+.editor-canvas-wrap {
+  position: relative;
+
+  width: min(360px, 100%);
+
+  aspect-ratio: 1 / 1;
+
+  margin: 0 auto;
+
+  overflow: hidden;
+
+  border-radius: 18px;
+
+  background: #eeeeee;
+
+  box-shadow: 0 15px 40px rgba(60, 40, 25, 0.18);
+}
+
+.editor-canvas {
+  display: block;
+
+  width: 100%;
+  height: 100%;
+
+  touch-action: none;
+
+  cursor: grab;
+
+  user-select: none;
+
+  -webkit-user-select: none;
+}
+
+.editor-canvas.dragging {
+  cursor: grabbing;
+}
+
+/* =========================================================
+   CROP CIRCLE
+========================================================= */
+
+.editor-crop-circle {
+  position: absolute;
+
+  inset: 0;
+
+  pointer-events: none;
+
+  border: 3px solid rgba(255, 255, 255, 0.95);
+
+  border-radius: 50%;
+
+  box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.28);
+}
+
+/* =========================================================
+   HINT
+========================================================= */
+
+.editor-hint {
+  margin: 15px 0;
+
+  color: #89817a;
+
+  font-size: 12px;
+
+  line-height: 1.5;
+}
+
+/* =========================================================
+   ZOOM
+========================================================= */
+
+.zoom-row {
+  width: 100%;
+
+  display: flex;
+
+  align-items: center;
+
+  gap: 10px;
+
+  margin-top: 10px;
+}
+
+.zoom-button {
+  flex: 0 0 auto;
+
+  width: 42px;
+  height: 42px;
+
+  display: flex;
+
+  align-items: center;
+  justify-content: center;
+
+  padding: 0;
+
+  border: 1px solid #ded5ce;
+
+  border-radius: 12px;
+
+  background: #faf7f4;
+
+  color: #8b654b;
+
+  font-size: 25px;
+
+  cursor: pointer;
+}
+
+.zoom-button:hover {
+  background: #f4e9df;
+}
+
+.zoom-range {
+  flex: 1;
+
+  min-width: 0;
+
+  height: 6px;
+
+  cursor: pointer;
+
+  accent-color: #b57b50;
+}
+
+.zoom-value {
+  margin-top: 8px;
+
+  color: #8a7362;
+
+  font-size: 12px;
+
+  font-weight: 800;
+}
+
+/* =========================================================
+   EDITOR ACTIONS
+========================================================= */
+
+.editor-actions {
+  width: 100%;
+
+  display: grid;
+
+  grid-template-columns:
+    1fr
+    1fr
+    1.2fr;
+
+  gap: 10px;
+
+  margin-top: 18px;
+}
+
+.editor-reset,
+.editor-cancel,
+.editor-save {
+  min-height: 46px;
+
+  padding: 10px 12px;
+
+  border: 0;
+
+  border-radius: 12px;
+
+  font-family: inherit;
+
+  font-size: 13px;
+
+  font-weight: 800;
+
+  cursor: pointer;
+}
+
+.editor-reset {
+  background: #f6f0eb;
+
+  color: #7d6250;
+}
+
+.editor-reset:hover {
+  background: #eee4dc;
+}
+
+.editor-cancel {
+  background: #eeeeee;
+
+  color: #555555;
+}
+
+.editor-cancel:hover {
+  background: #e4e4e4;
+}
+
+.editor-save {
+  background: linear-gradient(135deg, #c58b5b, #a97045);
+
+  color: white;
+
+  box-shadow: 0 8px 20px rgba(165, 105, 65, 0.2);
+}
+
+.editor-save:hover {
+  box-shadow: 0 12px 25px rgba(165, 105, 65, 0.28);
 }
 
 /* =========================================================
@@ -1543,18 +2164,6 @@ async function continueToTemplates() {
     font-size: 16px;
   }
 
-  .field input[type="date"],
-  .field input[type="time"] {
-    width: 100%;
-    max-width: 100%;
-
-    height: 50px;
-
-    padding: 12px;
-
-    font-size: 15px;
-  }
-
   .section-title {
     width: 100%;
 
@@ -1607,6 +2216,36 @@ async function continueToTemplates() {
 
     padding: 40px 22px;
   }
+
+  /* Editor */
+
+  .image-editor-overlay {
+    padding: 10px;
+  }
+
+  .image-editor-modal {
+    width: 100%;
+
+    max-height: calc(100vh - 20px);
+
+    border-radius: 18px;
+  }
+
+  .image-editor-header {
+    padding: 15px;
+  }
+
+  .image-editor-workspace {
+    padding: 14px;
+  }
+
+  .editor-actions {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .editor-save {
+    grid-column: 1 / -1;
+  }
 }
 
 /* =========================================================
@@ -1622,53 +2261,10 @@ async function continueToTemplates() {
     font-size: 34px;
   }
 
-  .page-header > div {
-    font-size: 13px;
-  }
-
   .form {
     padding: 18px 12px;
 
     border-radius: 16px;
-  }
-
-  .section-title {
-    gap: 10px;
-  }
-
-  .section-title > span {
-    width: 34px;
-    height: 34px;
-
-    font-size: 10px;
-  }
-
-  .section-title h2 {
-    font-size: 18px;
-  }
-
-  .section-title p {
-    font-size: 11px;
-  }
-
-  .field label {
-    font-size: 12px;
-  }
-
-  .field input,
-  .field textarea {
-    padding: 13px 12px;
-
-    font-size: 16px;
-  }
-
-  .field input[type="date"],
-  .field input[type="time"] {
-    height: 48px;
-
-    padding: 10px;
-
-    font-size: 14px;
   }
 
   .preview-card {
@@ -1690,6 +2286,31 @@ async function continueToTemplates() {
 
   .preview-card h2 {
     font-size: 25px;
+  }
+
+  .image-editor-workspace {
+    padding: 10px;
+  }
+
+  .editor-canvas-wrap {
+    border-radius: 14px;
+  }
+
+  .editor-hint {
+    font-size: 11px;
+  }
+
+  .zoom-button {
+    width: 38px;
+    height: 38px;
+  }
+
+  .editor-reset,
+  .editor-cancel,
+  .editor-save {
+    min-height: 43px;
+
+    font-size: 12px;
   }
 }
 </style>
