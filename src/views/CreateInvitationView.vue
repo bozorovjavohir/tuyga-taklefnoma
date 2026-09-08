@@ -29,14 +29,74 @@ const {
 |--------------------------------------------------------------------------
 | LOCAL STORAGE
 |--------------------------------------------------------------------------
-|
-| Formadagi o'zgarishlarni avtomatik LocalStorage'ga saqlaymiz.
-|
 */
 
 invitationStore.$subscribe(() => {
   invitationStore.save();
 });
+
+/*
+|--------------------------------------------------------------------------
+| TELEFON RAQAMI
+|--------------------------------------------------------------------------
+|
+| Format:
+| +998 90 123 45 67
+|
+| +998 dan keyin faqat 9 ta raqam.
+|--------------------------------------------------------------------------
+*/
+
+function formatPhone(type: "groomPhone" | "bridePhone") {
+  let value = invitationStore[type] || "";
+
+  // Faqat raqamlarni olamiz
+  let digits = value.replace(/\D/g, "");
+
+  // Agar foydalanuvchi +998 yozsa, 998 ni olib tashlaymiz
+  if (digits.startsWith("998")) {
+    digits = digits.slice(3);
+  }
+
+  // +998 dan keyin faqat 9 ta raqam
+  digits = digits.slice(0, 9);
+
+  let formatted = "+998";
+
+  if (digits.length > 0) {
+    formatted += " " + digits.slice(0, 2);
+  }
+
+  if (digits.length > 2) {
+    formatted += " " + digits.slice(2, 5);
+  }
+
+  if (digits.length > 5) {
+    formatted += " " + digits.slice(5, 7);
+  }
+
+  if (digits.length > 7) {
+    formatted += " " + digits.slice(7, 9);
+  }
+
+  invitationStore[type] = formatted;
+}
+
+/*
+|--------------------------------------------------------------------------
+| TELEFON VALIDATSIYA
+|--------------------------------------------------------------------------
+*/
+
+function isValidPhone(phone: string) {
+  if (!phone) {
+    return true;
+  }
+
+  const digits = phone.replace(/\D/g, "");
+
+  return digits.length === 12 && digits.startsWith("998");
+}
 
 /*
 |--------------------------------------------------------------------------
@@ -103,6 +163,24 @@ function validateForm() {
     return false;
   }
 
+  // Kuyov telefoni noto'g'ri bo'lsa
+  if (groomPhone.value && !isValidPhone(groomPhone.value)) {
+    alert(
+      "Kuyov telefon raqami +998 dan keyin 9 ta raqamdan iborat bo‘lishi kerak."
+    );
+
+    return false;
+  }
+
+  // Kelin telefoni noto'g'ri bo'lsa
+  if (bridePhone.value && !isValidPhone(bridePhone.value)) {
+    alert(
+      "Kelin telefon raqami +998 dan keyin 9 ta raqamdan iborat bo‘lishi kerak."
+    );
+
+    return false;
+  }
+
   return true;
 }
 
@@ -127,13 +205,10 @@ async function continueToTemplates() {
       button.textContent = "Saqlanmoqda...";
     }
 
-    // Barcha ma'lumotlarni LocalStorage'ga saqlash
     invitationStore.save();
 
     console.log("Taklifnoma LocalStorage'ga saqlandi");
 
-    // ID ham yo'q, Firebase ham yo'q
-    // To'g'ridan-to'g'ri Templates sahifasiga o'tamiz
     await router.push("/templates");
   } catch (error) {
     console.error("Taklifnomani saqlashda xatolik:", error);
@@ -149,6 +224,7 @@ async function continueToTemplates() {
   }
 }
 </script>
+
 <template>
   <main class="create-page">
     <div class="page-header">
@@ -166,7 +242,10 @@ async function continueToTemplates() {
 
     <section class="form-wrapper">
       <form class="form" @submit.prevent>
-        <!-- 01 -->
+        <!-- =====================================================
+             01
+        ====================================================== -->
+
         <div class="section-title">
           <span>01</span>
 
@@ -198,7 +277,10 @@ async function continueToTemplates() {
           </div>
         </div>
 
-        <!-- 02 -->
+        <!-- =====================================================
+             02
+        ====================================================== -->
+
         <div class="section-title">
           <span>02</span>
 
@@ -212,13 +294,16 @@ async function continueToTemplates() {
           <label class="upload-box">
             <input type="file" accept="image/*" @change="handleMainPhoto" />
 
-            <span v-if="!mainPhoto"> 📷 Rasm tanlash </span>
+            <span v-if="!mainPhoto">📷 Rasm tanlash</span>
 
             <img v-else :src="mainPhoto" alt="Asosiy foto" />
           </label>
         </div>
 
-        <!-- 03 -->
+        <!-- =====================================================
+             03
+        ====================================================== -->
+
         <div class="section-title">
           <span>03</span>
 
@@ -228,21 +313,24 @@ async function continueToTemplates() {
           </div>
         </div>
 
-        <div class="fields">
+        <div class="fields date-fields">
           <div class="field">
             <label>Sana</label>
 
-            <input v-model="weddingDate" type="date" />
+            <input v-model="weddingDate" type="date" class="date-input" />
           </div>
 
           <div class="field">
             <label>Boshlanish vaqti</label>
 
-            <input v-model="weddingTime" type="time" />
+            <input v-model="weddingTime" type="time" class="time-input" />
           </div>
         </div>
 
-        <!-- 04 -->
+        <!-- =====================================================
+             04
+        ====================================================== -->
+
         <div class="section-title">
           <span>04</span>
 
@@ -292,7 +380,10 @@ async function continueToTemplates() {
           />
         </div>
 
-        <!-- 05 -->
+        <!-- =====================================================
+             05
+        ====================================================== -->
+
         <div class="section-title">
           <span>05</span>
 
@@ -309,7 +400,11 @@ async function continueToTemplates() {
             <input
               v-model="groomPhone"
               type="tel"
+              inputmode="numeric"
+              autocomplete="tel"
+              maxlength="17"
               placeholder="+998 90 123 45 67"
+              @input="formatPhone('groomPhone')"
             />
           </div>
 
@@ -319,12 +414,19 @@ async function continueToTemplates() {
             <input
               v-model="bridePhone"
               type="tel"
+              inputmode="numeric"
+              autocomplete="tel"
+              maxlength="17"
               placeholder="+998 91 123 45 67"
+              @input="formatPhone('bridePhone')"
             />
           </div>
         </div>
 
-        <!-- 06 -->
+        <!-- =====================================================
+             06
+        ====================================================== -->
+
         <div class="section-title">
           <span>06</span>
 
@@ -374,7 +476,10 @@ async function continueToTemplates() {
           />
         </div>
 
-        <!-- 07 -->
+        <!-- =====================================================
+             07
+        ====================================================== -->
+
         <div class="section-title">
           <span>07</span>
 
@@ -403,7 +508,10 @@ async function continueToTemplates() {
         </button>
       </form>
 
-      <!-- PREVIEW -->
+      <!-- =====================================================
+           PREVIEW
+      ====================================================== -->
+
       <aside class="preview">
         <p>OLDINDAN KO‘RISH</p>
 
@@ -447,13 +555,21 @@ async function continueToTemplates() {
 </template>
 
 <style scoped>
-/* ================================
-   PAGE
-================================ */
+/* =========================================================
+   GLOBAL
+========================================================= */
+
+* {
+  box-sizing: border-box;
+}
 
 .create-page {
+  width: 100%;
   min-height: 100vh;
+
   padding: 80px 24px;
+
+  overflow-x: hidden;
 
   background: radial-gradient(
       circle at top left,
@@ -465,12 +581,14 @@ async function continueToTemplates() {
   color: #2d2926;
 }
 
-/* ================================
+/* =========================================================
    HEADER
-================================ */
+========================================================= */
 
 .page-header {
+  width: 100%;
   max-width: 850px;
+
   margin: 0 auto 55px;
 
   text-align: center;
@@ -505,6 +623,7 @@ async function continueToTemplates() {
 }
 
 .page-header > div {
+  width: 100%;
   max-width: 600px;
 
   margin: 22px auto 0;
@@ -515,9 +634,9 @@ async function continueToTemplates() {
   line-height: 1.7;
 }
 
-/* ================================
+/* =========================================================
    MAIN LAYOUT
-================================ */
+========================================================= */
 
 .form-wrapper {
   width: 100%;
@@ -527,19 +646,26 @@ async function continueToTemplates() {
 
   display: grid;
 
-  grid-template-columns: minmax(0, 1.35fr) minmax(320px, 0.65fr);
+  grid-template-columns:
+    minmax(0, 1.35fr)
+    minmax(300px, 0.65fr);
 
   gap: 45px;
 
   align-items: start;
 }
 
-/* ================================
+/* =========================================================
    FORM
-================================ */
+========================================================= */
 
 .form {
+  width: 100%;
+  min-width: 0;
+
   padding: 38px;
+
+  overflow: hidden;
 
   background: rgba(255, 255, 255, 0.95);
 
@@ -550,11 +676,14 @@ async function continueToTemplates() {
   box-shadow: 0 20px 60px rgba(70, 45, 25, 0.07);
 }
 
-/* ================================
+/* =========================================================
    SECTION TITLE
-================================ */
+========================================================= */
 
 .section-title {
+  width: 100%;
+  min-width: 0;
+
   display: flex;
 
   align-items: center;
@@ -594,6 +723,10 @@ async function continueToTemplates() {
   font-weight: 800;
 }
 
+.section-title > div {
+  min-width: 0;
+}
+
 .section-title h2 {
   margin: 0 0 4px;
 
@@ -611,16 +744,23 @@ async function continueToTemplates() {
   color: #98918b;
 
   font-size: 13px;
+
+  line-height: 1.5;
 }
 
-/* ================================
+/* =========================================================
    FIELDS
-================================ */
+========================================================= */
 
 .fields {
+  width: 100%;
+  min-width: 0;
+
   display: grid;
 
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns:
+    minmax(0, 1fr)
+    minmax(0, 1fr);
 
   gap: 20px;
 
@@ -628,6 +768,9 @@ async function continueToTemplates() {
 }
 
 .field {
+  width: 100%;
+  min-width: 0;
+
   margin-bottom: 20px;
 }
 
@@ -644,9 +787,11 @@ async function continueToTemplates() {
 
 .field input,
 .field textarea {
-  width: 100%;
+  display: block;
 
-  box-sizing: border-box;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
 
   padding: 15px 16px;
 
@@ -692,11 +837,43 @@ async function continueToTemplates() {
   line-height: 1.7;
 }
 
-/* ================================
+/* =========================================================
+   DATE / TIME
+========================================================= */
+
+.field input[type="date"],
+.field input[type="time"] {
+  width: 100%;
+  min-width: 0;
+
+  height: 52px;
+
+  padding: 12px;
+
+  appearance: none;
+  -webkit-appearance: none;
+
+  font-size: 15px;
+
+  color: #332e2a;
+}
+
+.field input[type="date"]::-webkit-date-and-time-value {
+  text-align: left;
+}
+
+.field input[type="date"]::-webkit-calendar-picker-indicator,
+.field input[type="time"]::-webkit-calendar-picker-indicator {
+  cursor: pointer;
+}
+
+/* =========================================================
    PHOTO UPLOAD
-================================ */
+========================================================= */
 
 .photo-upload {
+  width: 100%;
+
   margin-bottom: 35px;
 }
 
@@ -739,6 +916,8 @@ async function continueToTemplates() {
 }
 
 .upload-box span {
+  max-width: calc(100% - 30px);
+
   padding: 14px 22px;
 
   border-radius: 30px;
@@ -750,22 +929,29 @@ async function continueToTemplates() {
   font-size: 14px;
   font-weight: 700;
 
+  text-align: center;
+
   box-shadow: 0 8px 25px rgba(80, 50, 30, 0.08);
 }
 
 .upload-box img {
+  display: block;
+
   width: 100%;
   height: 320px;
 
   object-fit: cover;
 }
 
-/* ================================
+/* =========================================================
    BUTTON
-================================ */
+========================================================= */
 
 .submit-button {
+  display: block;
+
   width: 100%;
+  max-width: 100%;
 
   margin-top: 15px;
 
@@ -799,14 +985,25 @@ async function continueToTemplates() {
   transform: translateY(0);
 }
 
-/* ================================
+.submit-button:disabled {
+  opacity: 0.65;
+
+  cursor: not-allowed;
+
+  transform: none;
+}
+
+/* =========================================================
    PREVIEW
-================================ */
+========================================================= */
 
 .preview {
   position: sticky;
 
   top: 25px;
+
+  width: 100%;
+  min-width: 0;
 
   display: flex;
 
@@ -824,16 +1021,18 @@ async function continueToTemplates() {
   font-weight: 800;
 
   letter-spacing: 3px;
+
+  text-align: center;
 }
 
-/* ================================
+/* =========================================================
    PHONE PREVIEW
-================================ */
+========================================================= */
 
 .preview-card {
   position: relative;
 
-  width: 330px;
+  width: min(330px, 100%);
 
   min-height: 620px;
 
@@ -881,9 +1080,9 @@ async function continueToTemplates() {
   background: #292522;
 }
 
-/* ================================
+/* =========================================================
    PREVIEW PHOTO
-================================ */
+========================================================= */
 
 .preview-photo {
   width: 155px;
@@ -900,9 +1099,9 @@ async function continueToTemplates() {
   box-shadow: 0 10px 30px rgba(50, 35, 25, 0.15);
 }
 
-/* ================================
+/* =========================================================
    PREVIEW HEART
-================================ */
+========================================================= */
 
 .rings {
   margin-bottom: 10px;
@@ -912,11 +1111,13 @@ async function continueToTemplates() {
   font-size: 38px;
 }
 
-/* ================================
+/* =========================================================
    PREVIEW NAME
-================================ */
+========================================================= */
 
 .preview-card h2 {
+  max-width: 100%;
+
   margin: 10px 0 18px;
 
   font-family: Georgia, "Times New Roman", serif;
@@ -927,6 +1128,8 @@ async function continueToTemplates() {
   font-weight: 400;
 
   color: #3b3029;
+
+  overflow-wrap: anywhere;
 }
 
 .line {
@@ -935,15 +1138,21 @@ async function continueToTemplates() {
 
   margin-bottom: 20px;
 
+  flex: 0 0 auto;
+
   background: #c58b5b;
 }
 
 .preview-card p {
+  max-width: 100%;
+
   margin: 5px 0;
 
   color: #807872;
 
   font-size: 14px;
+
+  overflow-wrap: anywhere;
 }
 
 .preview-date {
@@ -960,13 +1169,15 @@ async function continueToTemplates() {
   font-weight: 800;
 }
 
-/* ================================
-   RESPONSIVE
-================================ */
+/* =========================================================
+   TABLET
+========================================================= */
 
 @media (max-width: 1050px) {
   .form-wrapper {
     grid-template-columns: 1fr;
+
+    gap: 35px;
   }
 
   .preview {
@@ -976,96 +1187,234 @@ async function continueToTemplates() {
   }
 
   .preview-card {
-    width: 350px;
+    width: min(350px, 100%);
   }
 }
 
+/* =========================================================
+   MOBILE
+========================================================= */
+
 @media (max-width: 700px) {
   .create-page {
-    padding: 50px 15px;
+    padding: 45px 12px;
   }
 
   .page-header {
-    margin-bottom: 35px;
+    margin-bottom: 30px;
+  }
+
+  .page-header > p {
+    margin-bottom: 14px;
+
+    font-size: 10px;
+
+    letter-spacing: 3px;
   }
 
   .page-header h1 {
-    font-size: 42px;
+    font-size: clamp(34px, 10vw, 42px);
+
+    line-height: 1.1;
+  }
+
+  .page-header > div {
+    margin-top: 17px;
+
+    font-size: 14px;
+
+    line-height: 1.6;
+  }
+
+  .form-wrapper {
+    width: 100%;
+
+    display: flex;
+
+    flex-direction: column;
+
+    gap: 30px;
   }
 
   .form {
-    padding: 22px 18px;
+    width: 100%;
+
+    padding: 20px 15px;
 
     border-radius: 18px;
   }
 
   .fields {
-    grid-template-columns: 1fr;
+    width: 100%;
+
+    grid-template-columns: minmax(0, 1fr);
 
     gap: 0;
+
+    margin-bottom: 5px;
+  }
+
+  .field {
+    width: 100%;
+
+    margin-bottom: 18px;
+  }
+
+  .field input,
+  .field textarea {
+    width: 100%;
+    max-width: 100%;
+
+    font-size: 16px;
+  }
+
+  .field input[type="date"],
+  .field input[type="time"] {
+    width: 100%;
+    max-width: 100%;
+
+    height: 50px;
+
+    padding: 12px;
+
+    font-size: 15px;
   }
 
   .section-title {
-    margin-top: 30px;
+    width: 100%;
+
+    margin-top: 28px;
+    margin-bottom: 20px;
+
+    gap: 12px;
   }
 
-  .preview-card {
-    width: min(350px, 92vw);
+  .section-title > span {
+    width: 38px;
+    height: 38px;
 
-    min-height: 580px;
-  }
-}
-
-@media (max-width: 400px) {
-  .page-header h1 {
-    font-size: 36px;
+    font-size: 11px;
   }
 
   .section-title h2 {
     font-size: 19px;
   }
 
-  .preview-card {
-    width: 92vw;
+  .section-title p {
+    font-size: 12px;
+  }
 
-    border-width: 6px;
+  .upload-box {
+    min-height: 220px;
+  }
+
+  .upload-box img {
+    width: 100%;
+    height: 220px;
+  }
+
+  .submit-button {
+    width: 100%;
+
+    padding: 16px 12px;
+
+    font-size: 14px;
+  }
+
+  .preview {
+    width: 100%;
+  }
+
+  .preview-card {
+    width: min(350px, 100%);
+
+    min-height: 580px;
+
+    padding: 40px 22px;
   }
 }
-.templates-page h1,
-.templates-page h2,
-.templates-page h3 {
-  color: #302a26;
-}
 
-.templates-page p {
-  color: #6f665f;
-}
+/* =========================================================
+   SMALL MOBILE
+========================================================= */
 
-.templates-page span {
-  color: inherit;
-}
+@media (max-width: 400px) {
+  .create-page {
+    padding: 35px 8px;
+  }
 
-.page-header h1 {
-  color: #302a26;
-}
+  .page-header h1 {
+    font-size: 34px;
+  }
 
-.page-header h1 span {
-  color: #b57b50;
-}
+  .page-header > div {
+    font-size: 13px;
+  }
 
-.template-info h2 {
-  color: #302a26;
-}
+  .form {
+    padding: 18px 12px;
 
-.template-info p {
-  color: #817870;
-}
+    border-radius: 16px;
+  }
 
-.selected-info span {
-  color: #817870;
-}
+  .section-title {
+    gap: 10px;
+  }
 
-.selected-info strong {
-  color: #302a26;
+  .section-title > span {
+    width: 34px;
+    height: 34px;
+
+    font-size: 10px;
+  }
+
+  .section-title h2 {
+    font-size: 18px;
+  }
+
+  .section-title p {
+    font-size: 11px;
+  }
+
+  .field label {
+    font-size: 12px;
+  }
+
+  .field input,
+  .field textarea {
+    padding: 13px 12px;
+
+    font-size: 16px;
+  }
+
+  .field input[type="date"],
+  .field input[type="time"] {
+    height: 48px;
+
+    padding: 10px;
+
+    font-size: 14px;
+  }
+
+  .preview-card {
+    width: 100%;
+
+    min-height: 560px;
+
+    padding: 35px 18px;
+
+    border-width: 6px;
+
+    border-radius: 30px;
+  }
+
+  .preview-photo {
+    width: 135px;
+    height: 135px;
+  }
+
+  .preview-card h2 {
+    font-size: 25px;
+  }
 }
 </style>
