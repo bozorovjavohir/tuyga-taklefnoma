@@ -145,7 +145,10 @@ function openTemplates() {
 ========================================= */
 
 .home-page {
+  width: 100%;
   min-height: 100vh;
+  margin: 0;
+  padding: 0;
 
   background: radial-gradient(
       circle at 15% 10%,
@@ -504,6 +507,7 @@ function openTemplates() {
   font-family: Georgia, "Times New Roman", serif;
 
   font-size: clamp(36px, 5vw, 54px);
+  color: #3b3029;
 
   font-weight: 400;
 }
@@ -728,5 +732,42 @@ function openTemplates() {
   .bottom-cta h2 {
     font-size: 28px;
   }
+}
+.templates-page h1,
+.templates-page h2,
+.templates-page h3 {
+  color: #302a26;
+}
+
+.templates-page p {
+  color: #6f665f;
+}
+
+.templates-page span {
+  color: inherit;
+}
+
+.page-header h1 {
+  color: #302a26;
+}
+
+.page-header h1 span {
+  color: #b57b50;
+}
+
+.template-info h2 {
+  color: #302a26;
+}
+
+.template-info p {
+  color: #817870;
+}
+
+.selected-info span {
+  color: #817870;
+}
+
+.selected-info strong {
+  color: #302a26;
 }
 </style>

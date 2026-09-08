@@ -1769,4 +1769,349 @@ async function copyInvitationLink() {
     font-size: 23px;
   }
 }
+/* =========================================================
+   ✨ BEAUTIFUL TEXT & COLOR POLISH
+========================================================= */
+
+/* Umumiy matnlar */
+.invitation-page {
+  color: #3d332d;
+}
+
+.invitation-page h1,
+.invitation-page h2,
+.invitation-page h3 {
+  color: #3d332d;
+}
+
+.invitation-page p {
+  color: #766c65;
+}
+
+/* =========================================================
+   🤎 ELEGANT
+========================================================= */
+
+.theme-elegant {
+  color: #46382f;
+
+  background: radial-gradient(
+      circle at 10% 5%,
+      rgba(205, 163, 125, 0.18),
+      transparent 30%
+    ),
+    linear-gradient(180deg, #faf6f1 0%, #f5eee7 100%);
+}
+
+.theme-elegant .invitation {
+  background: #fffdfa;
+}
+
+.theme-elegant .hero-section {
+  background: radial-gradient(
+      circle at 50% 35%,
+      rgba(255, 255, 255, 0.95),
+      transparent 45%
+    ),
+    linear-gradient(145deg, #fffdf9, #f3e4d5);
+}
+
+.theme-elegant .couple-names,
+.theme-elegant .section-title,
+.theme-elegant .ending-section h2 {
+  color: #49382e;
+}
+
+.theme-elegant .small-title,
+.theme-elegant .section-label,
+.theme-elegant .date,
+.theme-elegant .info-icon,
+.theme-elegant .ending-heart {
+  color: #b47b50;
+}
+
+.theme-elegant .welcome-text {
+  color: #806f61;
+}
+
+.theme-elegant .info-card,
+.theme-elegant .location-card,
+.theme-elegant .contact-card {
+  background: rgba(255, 250, 245, 0.8);
+
+  border-color: rgba(180, 123, 80, 0.18);
+}
+
+.theme-elegant .info-value,
+.theme-elegant .location-card h3,
+.theme-elegant .contact-name,
+.theme-elegant .ending-names {
+  color: #49382e;
+}
+
+.theme-elegant .info-sub,
+.theme-elegant .location-card p,
+.theme-elegant .contact-phone {
+  color: #887b70;
+}
+
+/* =========================================================
+   🌸 ROMANTIC
+========================================================= */
+
+.theme-romantic {
+  color: #63434a;
+
+  background: radial-gradient(
+      circle at 10% 5%,
+      rgba(224, 164, 177, 0.22),
+      transparent 30%
+    ),
+    linear-gradient(180deg, #fff9fa 0%, #f9eaed 100%);
+}
+
+.theme-romantic .invitation {
+  background: #fffdfd;
+}
+
+.theme-romantic .hero-section {
+  background: radial-gradient(
+      circle at 50% 35%,
+      rgba(255, 255, 255, 0.9),
+      transparent 45%
+    ),
+    linear-gradient(145deg, #fffafb, #f4dadd);
+}
+
+.theme-romantic .couple-names,
+.theme-romantic .section-title,
+.theme-romantic .ending-section h2 {
+  color: #663f47;
+}
+
+.theme-romantic .small-title,
+.theme-romantic .section-label,
+.theme-romantic .date,
+.theme-romantic .info-icon,
+.theme-romantic .ending-heart {
+  color: #b85f73;
+}
+
+.theme-romantic .welcome-text {
+  color: #8c626b;
+}
+
+.theme-romantic .info-card,
+.theme-romantic .location-card,
+.theme-romantic .contact-card {
+  background: rgba(255, 247, 249, 0.85);
+
+  border-color: rgba(184, 95, 115, 0.18);
+}
+
+.theme-romantic .info-value,
+.theme-romantic .location-card h3,
+.theme-romantic .contact-name,
+.theme-romantic .ending-names {
+  color: #673f47;
+}
+
+.theme-romantic .info-sub,
+.theme-romantic .location-card p,
+.theme-romantic .contact-phone {
+  color: #92727a;
+}
+
+/* =========================================================
+   🤍 MINIMAL
+========================================================= */
+
+.theme-minimal {
+  color: #30302e;
+
+  background: radial-gradient(
+      circle at 15% 10%,
+      rgba(210, 205, 194, 0.25),
+      transparent 30%
+    ),
+    #f3f2ed;
+}
+
+.theme-minimal .invitation {
+  background: #fcfcf9;
+}
+
+.theme-minimal .hero-section {
+  background: #f7f7f3;
+}
+
+.theme-minimal .couple-names,
+.theme-minimal .section-title,
+.theme-minimal .ending-section h2 {
+  color: #252525;
+}
+
+.theme-minimal .small-title,
+.theme-minimal .section-label {
+  color: #77736c;
+}
+
+.theme-minimal .date,
+.theme-minimal .info-icon,
+.theme-minimal .ending-heart {
+  color: #57554f;
+}
+
+.theme-minimal .welcome-text {
+  color: #77756f;
+}
+
+.theme-minimal .info-card,
+.theme-minimal .location-card,
+.theme-minimal .contact-card {
+  background: #ffffff;
+
+  border-color: #deddd7;
+}
+
+.theme-minimal .info-value,
+.theme-minimal .location-card h3,
+.theme-minimal .contact-name,
+.theme-minimal .ending-names {
+  color: #30302e;
+}
+
+.theme-minimal .info-sub,
+.theme-minimal .location-card p,
+.theme-minimal .contact-phone {
+  color: #77756f;
+}
+
+/* =========================================================
+   🥂 LUXURY
+========================================================= */
+
+.theme-luxury {
+  color: #ead8b5;
+
+  background: radial-gradient(
+      circle at 50% 0%,
+      rgba(184, 145, 75, 0.16),
+      transparent 35%
+    ),
+    #120e0b;
+}
+
+.theme-luxury .invitation {
+  background: #1d1713;
+}
+
+.theme-luxury .hero-section {
+  background: radial-gradient(
+      circle at 50% 35%,
+      rgba(104, 77, 44, 0.42),
+      transparent 45%
+    ),
+    linear-gradient(145deg, #34271e, #17110d);
+}
+
+.theme-luxury .couple-names,
+.theme-luxury .section-title,
+.theme-luxury .ending-section h2 {
+  color: #f0d8a8;
+}
+
+.theme-luxury .small-title,
+.theme-luxury .section-label,
+.theme-luxury .date,
+.theme-luxury .info-icon,
+.theme-luxury .ending-heart {
+  color: #d8b56f;
+}
+
+.theme-luxury .welcome-text {
+  color: #c8b28f;
+}
+
+.theme-luxury .info-card,
+.theme-luxury .location-card,
+.theme-luxury .contact-card {
+  background: rgba(255, 255, 255, 0.025);
+
+  border-color: rgba(216, 181, 111, 0.22);
+}
+
+.theme-luxury .info-value,
+.theme-luxury .location-card h3,
+.theme-luxury .contact-name,
+.theme-luxury .ending-names {
+  color: #ead3a3;
+}
+
+.theme-luxury .info-sub,
+.theme-luxury .location-card p,
+.theme-luxury .contact-phone {
+  color: #bca989;
+}
+
+/* =========================================================
+   BUTTON COLORS
+========================================================= */
+
+.theme-elegant .sharing-buttons button,
+.theme-elegant .map-buttons button {
+  color: #a97045;
+}
+
+.theme-romantic .sharing-buttons button,
+.theme-romantic .map-buttons button {
+  color: #ad5d70;
+}
+
+.theme-minimal .sharing-buttons button,
+.theme-minimal .map-buttons button {
+  color: #4f4d48;
+}
+
+.theme-luxury .sharing-buttons button,
+.theme-luxury .map-buttons button {
+  color: #d8b56f;
+}
+
+/* =========================================================
+   SOFT HOVER
+========================================================= */
+
+.info-card,
+.location-card,
+.contact-card,
+.social-list button,
+.sharing-buttons button {
+  transition: transform 0.25s ease, box-shadow 0.25s ease, background 0.25s ease,
+    border-color 0.25s ease;
+}
+
+.info-card:hover,
+.location-card:hover,
+.contact-card:hover {
+  transform: translateY(-3px);
+}
+
+.theme-elegant .info-card:hover,
+.theme-elegant .location-card:hover,
+.theme-elegant .contact-card:hover {
+  box-shadow: 0 15px 35px rgba(130, 85, 50, 0.08);
+}
+
+.theme-romantic .info-card:hover,
+.theme-romantic .location-card:hover,
+.theme-romantic .contact-card:hover {
+  box-shadow: 0 15px 35px rgba(170, 80, 100, 0.1);
+}
+
+.theme-luxury .info-card:hover,
+.theme-luxury .location-card:hover,
+.theme-luxury .contact-card:hover {
+  box-shadow: 0 15px 35px rgba(216, 181, 111, 0.08);
+}
 </style>

@@ -168,10 +168,6 @@ onMounted(() => {
     ================================================== -->
 
     <header class="page-header">
-      <button type="button" class="back-button" @click="goBack">
-        ← Orqaga
-      </button>
-
       <div class="eyebrow">TAKLIFNOMA DIZAYNI</div>
 
       <h1>
@@ -333,31 +329,6 @@ onMounted(() => {
   text-align: center;
 }
 
-.back-button {
-  position: absolute;
-
-  left: 0;
-  top: 0;
-
-  border: 0;
-
-  background: transparent;
-
-  color: #7f756d;
-
-  font-size: 14px;
-
-  font-weight: 700;
-
-  cursor: pointer;
-
-  transition: 0.2s;
-}
-
-.back-button:hover {
-  color: #b57b50;
-}
-
 .eyebrow {
   margin-bottom: 18px;
 
@@ -380,10 +351,7 @@ onMounted(() => {
   line-height: 1.05;
 
   font-weight: 400;
-}
-
-.page-header h1 span {
-  color: #b57b50;
+  color: #3b3029;
 }
 
 .page-header p {
@@ -940,5 +908,46 @@ onMounted(() => {
   .page-header h1 {
     font-size: 42px;
   }
+}
+/* =========================================
+   TEXT COLORS
+========================================= */
+
+.templates-page h1,
+.templates-page h2,
+.templates-page h3 {
+  color: #302a26;
+}
+
+.templates-page p {
+  color: #6f665f;
+}
+
+.templates-page span {
+  color: inherit;
+}
+
+.page-header h1 {
+  color: #302a26;
+}
+
+.page-header h1 span {
+  color: #b57b50;
+}
+
+.template-info h2 {
+  color: #302a26;
+}
+
+.template-info p {
+  color: #817870;
+}
+
+.selected-info span {
+  color: #817870;
+}
+
+.selected-info strong {
+  color: #302a26;
 }
 </style>
