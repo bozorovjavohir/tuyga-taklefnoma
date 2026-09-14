@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed } from "vue";
+import { computed, onMounted, onUnmounted, ref } from "vue";
 import { storeToRefs } from "pinia";
 import { useRouter } from "vue-router";
 
@@ -7,10 +7,6 @@ import { useInvitationStore } from "../stores/invitation";
 
 const router = useRouter();
 const invitationStore = useInvitationStore();
-
-/* =========================================================
-   STORE
-========================================================= */
 
 const {
   template,
@@ -30,7 +26,135 @@ const {
   telegramUrl,
   facebookUrl,
   tiktokUrl,
+  musicUrl,
 } = storeToRefs(invitationStore);
+
+/* =========================================================
+   MUSIC
+========================================================= */
+
+const audio = ref<HTMLAudioElement | null>(null);
+const isPlaying = ref(false);
+const musicError = ref(false);
+
+function toggleMusic() {
+  if (!audio.value || !musicUrl.value) {
+    return;
+  }
+
+  if (isPlaying.value) {
+    audio.value.pause();
+    isPlaying.value = false;
+  } else {
+    audio.value
+      .play()
+      .then(() => {
+        isPlaying.value = true;
+        musicError.value = false;
+      })
+      .catch((error) => {
+        console.error("Musiqani ishga tushirib bo'lmadi:", error);
+        musicError.value = true;
+        isPlaying.value = false;
+      });
+  }
+}
+
+function handleAudioEnded() {
+  if (!audio.value) {
+    return;
+  }
+
+  audio.value.currentTime = 0;
+
+  audio.value
+    .play()
+    .then(() => {
+      isPlaying.value = true;
+    })
+    .catch(() => {
+      isPlaying.value = false;
+    });
+}
+
+/* =========================================================
+   COUNTDOWN
+========================================================= */
+
+const countdown = ref({
+  days: 0,
+  hours: 0,
+  minutes: 0,
+  seconds: 0,
+});
+
+let countdownInterval: ReturnType<typeof setInterval> | null = null;
+
+function resetCountdown() {
+  countdown.value = {
+    days: 0,
+    hours: 0,
+    minutes: 0,
+    seconds: 0,
+  };
+}
+
+function updateCountdown() {
+  if (!weddingDate.value) {
+    resetCountdown();
+    return;
+  }
+
+  const targetDate = new Date(
+    `${weddingDate.value}T${weddingTime.value || "00:00"}`
+  ).getTime();
+
+  if (Number.isNaN(targetDate)) {
+    resetCountdown();
+    return;
+  }
+
+  const difference = targetDate - Date.now();
+
+  if (difference <= 0) {
+    resetCountdown();
+    return;
+  }
+
+  countdown.value = {
+    days: Math.floor(difference / (1000 * 60 * 60 * 24)),
+    hours: Math.floor((difference / (1000 * 60 * 60)) % 24),
+    minutes: Math.floor((difference / (1000 * 60)) % 60),
+    seconds: Math.floor((difference / 1000) % 60),
+  };
+}
+
+onMounted(() => {
+  updateCountdown();
+
+  countdownInterval = setInterval(updateCountdown, 1000);
+
+  if (musicUrl.value) {
+    audio.value = new Audio(musicUrl.value);
+    audio.value.loop = true;
+    audio.value.volume = 0.6;
+
+    audio.value.addEventListener("ended", handleAudioEnded);
+  }
+});
+
+onUnmounted(() => {
+  if (countdownInterval) {
+    clearInterval(countdownInterval);
+    countdownInterval = null;
+  }
+
+  if (audio.value) {
+    audio.value.pause();
+    audio.value.removeEventListener("ended", handleAudioEnded);
+    audio.value = null;
+  }
+});
 
 /* =========================================================
    TEMPLATE
@@ -97,6 +221,10 @@ const formattedDate = computed(() => {
   return `${date.getDate()} ${months[date.getMonth()]} ${date.getFullYear()}`;
 });
 
+/* =========================================================
+   WEEKDAY
+========================================================= */
+
 const weekday = computed(() => {
   const value = weddingDate.value;
 
@@ -135,15 +263,8 @@ function editInvitation() {
   router.push("/create");
 }
 
-/*
- * Yangi taklifnoma yaratish.
- *
- * Avval eski taklifnoma ma'lumotlarini reset qilamiz.
- * Keyin foydalanuvchini /create sahifasiga o'tkazamiz.
- */
 function createNextInvitation() {
   invitationStore.reset();
-
   router.push("/create");
 }
 
@@ -232,7 +353,7 @@ Sizni baxtli kunimizda kutib qolamiz! ❤️`;
 });
 
 /* =========================================================
-   SHARE TELEGRAM
+   TELEGRAM
 ========================================================= */
 
 function shareTelegram() {
@@ -245,7 +366,7 @@ function shareTelegram() {
 }
 
 /* =========================================================
-   SHARE WHATSAPP
+   WHATSAPP
 ========================================================= */
 
 function shareWhatsApp() {
@@ -294,13 +415,40 @@ async function copyInvitationLink() {
     </header>
 
     <!-- =====================================================
+         MUSIC BUTTON
+    ====================================================== -->
+
+    <button
+      v-if="musicUrl"
+      type="button"
+      class="music-button"
+      :class="{ playing: isPlaying }"
+      @click="toggleMusic"
+      :aria-label="isPlaying ? 'Musiqani to‘xtatish' : 'Musiqani yoqish'"
+    >
+      <span class="music-icon">
+        {{ isPlaying ? "Ⅱ" : "▶" }}
+      </span>
+
+      <span class="music-text">
+        {{ isPlaying ? "Musiqa ijro etilmoqda" : "Musiqani yoqish" }}
+      </span>
+
+      <span v-if="isPlaying" class="music-waves"> ♪ ♫ ♪ </span>
+    </button>
+
+    <div v-if="musicError" class="music-error">
+      Musiqani ishga tushirish uchun tugmani yana bosing.
+    </div>
+
+    <!-- =====================================================
          INVITATION
     ====================================================== -->
 
     <article class="invitation">
       <!-- ===================================================
            HERO
-      ==================================================== -->
+      ===================================================== -->
 
       <section class="hero-section">
         <div class="decor decor-one">✦</div>
@@ -362,7 +510,7 @@ async function copyInvitationLink() {
 
       <!-- ===================================================
            MESSAGE
-      ==================================================== -->
+      ===================================================== -->
 
       <section v-if="message" class="message-section">
         <div class="section-label">BIZNING TAKLIFIMIZ</div>
@@ -378,7 +526,7 @@ async function copyInvitationLink() {
 
       <!-- ===================================================
            INFO
-      ==================================================== -->
+      ===================================================== -->
 
       <section class="info-section">
         <div class="section-label">TO‘Y MA’LUMOTLARI</div>
@@ -430,11 +578,47 @@ async function copyInvitationLink() {
             </div>
           </div>
         </div>
+
+        <!-- =================================================
+             COUNTDOWN
+        ================================================== -->
+
+        <div class="countdown-wrapper">
+          <div class="countdown-title">TO‘YIMIZGACHA QOLDI</div>
+
+          <div class="countdown">
+            <div class="countdown-item">
+              <strong>{{ countdown.days }}</strong>
+              <span>Kun</span>
+            </div>
+
+            <div class="countdown-item">
+              <strong>
+                {{ String(countdown.hours).padStart(2, "0") }}
+              </strong>
+              <span>Soat</span>
+            </div>
+
+            <div class="countdown-item">
+              <strong>
+                {{ String(countdown.minutes).padStart(2, "0") }}
+              </strong>
+              <span>Daqiqa</span>
+            </div>
+
+            <div class="countdown-item">
+              <strong>
+                {{ String(countdown.seconds).padStart(2, "0") }}
+              </strong>
+              <span>Soniya</span>
+            </div>
+          </div>
+        </div>
       </section>
 
       <!-- ===================================================
            LOCATION
-      ==================================================== -->
+      ===================================================== -->
 
       <section
         v-if="venueName || address || googleMapsUrl || yandexMapsUrl"
@@ -471,7 +655,7 @@ async function copyInvitationLink() {
 
       <!-- ===================================================
            CONTACT
-      ==================================================== -->
+      ===================================================== -->
 
       <section v-if="groomPhone || bridePhone" class="contact-section">
         <div class="section-label">ALOQA</div>
@@ -521,7 +705,7 @@ async function copyInvitationLink() {
 
       <!-- ===================================================
            SOCIAL
-      ==================================================== -->
+      ===================================================== -->
 
       <section
         v-if="instagramUrl || telegramUrl || facebookUrl || tiktokUrl"
@@ -567,8 +751,8 @@ async function copyInvitationLink() {
       </section>
 
       <!-- ===================================================
-           SHARE LINKS
-      ==================================================== -->
+           SHARE
+      ===================================================== -->
 
       <section class="sharing-section">
         <div class="section-label">ULASHISH</div>
@@ -588,7 +772,7 @@ async function copyInvitationLink() {
 
       <!-- ===================================================
            ENDING
-      ==================================================== -->
+      ===================================================== -->
 
       <section class="ending-section">
         <div class="ending-heart">♡</div>
@@ -638,6 +822,18 @@ async function copyInvitationLink() {
   font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
 
   transition: background 0.4s, color 0.4s;
+
+  color: #3d332d;
+}
+
+.invitation-page h1,
+.invitation-page h2,
+.invitation-page h3 {
+  color: #3d332d;
+}
+
+.invitation-page p {
+  color: #766c65;
 }
 
 /* =========================================================
@@ -699,6 +895,129 @@ async function copyInvitationLink() {
 }
 
 /* =========================================================
+   MUSIC BUTTON
+========================================================= */
+
+.music-button {
+  position: fixed;
+
+  right: 25px;
+  bottom: 25px;
+
+  z-index: 100;
+
+  min-height: 54px;
+
+  padding: 10px 17px;
+
+  display: flex;
+  align-items: center;
+
+  gap: 10px;
+
+  border: 1px solid rgba(180, 123, 80, 0.25);
+
+  border-radius: 30px;
+
+  background: rgba(255, 253, 250, 0.94);
+
+  color: #a97045;
+
+  box-shadow: 0 12px 35px rgba(40, 25, 15, 0.15);
+
+  backdrop-filter: blur(15px);
+
+  cursor: pointer;
+
+  transition: transform 0.25s ease, box-shadow 0.25s ease;
+}
+
+.music-button:hover {
+  transform: translateY(-3px);
+
+  box-shadow: 0 16px 40px rgba(40, 25, 15, 0.2);
+}
+
+.music-button.playing {
+  animation: musicPulse 2s infinite;
+}
+
+.music-icon {
+  width: 30px;
+  height: 30px;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  border-radius: 50%;
+
+  background: #a97045;
+
+  color: white;
+
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.music-text {
+  font-size: 11px;
+  font-weight: 800;
+
+  letter-spacing: 0.3px;
+}
+
+.music-waves {
+  font-size: 14px;
+
+  letter-spacing: -3px;
+
+  animation: musicWave 1s infinite alternate;
+}
+
+.music-error {
+  position: fixed;
+
+  right: 25px;
+  bottom: 90px;
+
+  z-index: 100;
+
+  padding: 10px 14px;
+
+  border-radius: 12px;
+
+  background: #fff;
+
+  color: #a44;
+
+  font-size: 11px;
+
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.12);
+}
+
+@keyframes musicPulse {
+  0%,
+  100% {
+    box-shadow: 0 12px 35px rgba(40, 25, 15, 0.15);
+  }
+
+  50% {
+    box-shadow: 0 12px 45px rgba(169, 112, 69, 0.3);
+  }
+}
+
+@keyframes musicWave {
+  from {
+    transform: translateY(0);
+  }
+
+  to {
+    transform: translateY(-3px);
+  }
+}
+
+/* =========================================================
    INVITATION
 ========================================================= */
 
@@ -724,7 +1043,7 @@ async function copyInvitationLink() {
 .hero-section {
   position: relative;
 
-  min-height: 800px;
+  min-height: 850px;
 
   padding: 90px 30px;
 
@@ -904,6 +1223,88 @@ async function copyInvitationLink() {
 }
 
 /* =========================================================
+   COUNTDOWN
+========================================================= */
+
+.countdown-wrapper {
+  width: 100%;
+  max-width: 570px;
+
+  margin: 40px auto 0;
+}
+
+.countdown-title {
+  margin-bottom: 15px;
+
+  text-align: center;
+
+  font-size: 10px;
+  font-weight: 800;
+
+  letter-spacing: 4px;
+
+  opacity: 0.65;
+}
+
+.countdown {
+  display: grid;
+
+  grid-template-columns: repeat(4, 1fr);
+
+  gap: 12px;
+}
+
+.countdown-item {
+  min-width: 0;
+
+  padding: 18px 10px;
+
+  border: 1px solid rgba(0, 0, 0, 0.08);
+
+  border-radius: 16px;
+
+  background: rgba(255, 255, 255, 0.55);
+
+  backdrop-filter: blur(10px);
+
+  text-align: center;
+
+  transition: transform 0.25s ease, box-shadow 0.25s ease;
+}
+
+.countdown-item:hover {
+  transform: translateY(-3px);
+
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.08);
+}
+
+.countdown-item strong {
+  display: block;
+
+  font-family: Georgia, "Times New Roman", serif;
+
+  font-size: 32px;
+
+  font-weight: 400;
+
+  line-height: 1;
+}
+
+.countdown-item span {
+  display: block;
+
+  margin-top: 8px;
+
+  font-size: 9px;
+
+  font-weight: 800;
+
+  letter-spacing: 2px;
+
+  opacity: 0.65;
+}
+
+/* =========================================================
    DECOR
 ========================================================= */
 
@@ -1037,6 +1438,12 @@ async function copyInvitationLink() {
   border: 1px solid rgba(0, 0, 0, 0.08);
 
   border-radius: 18px;
+
+  transition: transform 0.25s ease, box-shadow 0.25s ease, background 0.25s ease;
+}
+
+.info-card:hover {
+  transform: translateY(-3px);
 }
 
 .info-icon {
@@ -1094,6 +1501,12 @@ async function copyInvitationLink() {
   border: 1px solid rgba(0, 0, 0, 0.08);
 
   background: rgba(255, 255, 255, 0.65);
+
+  transition: transform 0.25s ease, box-shadow 0.25s ease;
+}
+
+.location-card:hover {
+  transform: translateY(-3px);
 }
 
 .location-icon {
@@ -1112,11 +1525,9 @@ async function copyInvitationLink() {
 }
 
 .location-card p {
-  margin: 0 auto;
-
   max-width: 500px;
 
-  color: #817a75;
+  margin: 0 auto;
 
   font-size: 14px;
   line-height: 1.7;
@@ -1194,7 +1605,7 @@ async function copyInvitationLink() {
 
   cursor: pointer;
 
-  transition: 0.25s;
+  transition: transform 0.25s ease, box-shadow 0.25s ease;
 }
 
 .contact-card:hover {
@@ -1439,40 +1850,81 @@ async function copyInvitationLink() {
 ========================================================= */
 
 .theme-elegant {
+  color: #46382f;
+
   background: radial-gradient(
-      circle at top left,
-      rgba(197, 139, 91, 0.12),
+      circle at 10% 5%,
+      rgba(205, 163, 125, 0.18),
       transparent 30%
     ),
-    #faf8f5;
+    linear-gradient(180deg, #faf6f1 0%, #f5eee7 100%);
+}
 
-  color: #49382e;
+.theme-elegant .invitation {
+  background: #fffdfa;
 }
 
 .theme-elegant .hero-section {
-  background: linear-gradient(145deg, #fffdfb, #f3e4d6);
+  background: radial-gradient(
+      circle at 50% 35%,
+      rgba(255, 255, 255, 0.95),
+      transparent 45%
+    ),
+    linear-gradient(145deg, #fffdf9, #f3e4d5);
+}
+
+.theme-elegant .couple-names,
+.theme-elegant .section-title,
+.theme-elegant .ending-section h2 {
+  color: #49382e;
 }
 
 .theme-elegant .small-title,
-.theme-elegant .section-label {
-  color: #a97045;
+.theme-elegant .section-label,
+.theme-elegant .date,
+.theme-elegant .info-icon,
+.theme-elegant .ending-heart {
+  color: #b47b50;
 }
 
-.theme-elegant .date {
-  color: #a97045;
+.theme-elegant .welcome-text {
+  color: #806f61;
 }
 
 .theme-elegant .main-photo-wrapper {
   border: 1px solid #dcc2ad;
 }
 
-.theme-elegant .info-card {
-  background: #fffaf6;
+.theme-elegant .info-card,
+.theme-elegant .location-card,
+.theme-elegant .contact-card {
+  background: rgba(255, 250, 245, 0.8);
+
+  border-color: rgba(180, 123, 80, 0.18);
 }
 
-.theme-elegant .info-icon,
-.theme-elegant .ending-heart {
-  color: #b57b50;
+.theme-elegant .info-value,
+.theme-elegant .location-card h3,
+.theme-elegant .contact-name,
+.theme-elegant .ending-names {
+  color: #49382e;
+}
+
+.theme-elegant .info-sub,
+.theme-elegant .location-card p,
+.theme-elegant .contact-phone {
+  color: #887b70;
+}
+
+.theme-elegant .countdown-item {
+  border-color: rgba(180, 123, 80, 0.22);
+
+  background: rgba(255, 250, 245, 0.72);
+}
+
+.theme-elegant .countdown-item strong,
+.theme-elegant .countdown-title {
+  color: #a97045;
 }
 
 /* =========================================================
@@ -1480,40 +1932,81 @@ async function copyInvitationLink() {
 ========================================================= */
 
 .theme-romantic {
+  color: #63434a;
+
   background: radial-gradient(
-      circle at top left,
-      rgba(190, 103, 120, 0.12),
+      circle at 10% 5%,
+      rgba(224, 164, 177, 0.22),
       transparent 30%
     ),
-    #fff7f8;
+    linear-gradient(180deg, #fff9fa 0%, #f9eaed 100%);
+}
 
-  color: #68444b;
+.theme-romantic .invitation {
+  background: #fffdfd;
 }
 
 .theme-romantic .hero-section {
-  background: linear-gradient(145deg, #fff9fa, #f4dadd);
+  background: radial-gradient(
+      circle at 50% 35%,
+      rgba(255, 255, 255, 0.9),
+      transparent 45%
+    ),
+    linear-gradient(145deg, #fffafb, #f4dadd);
+}
+
+.theme-romantic .couple-names,
+.theme-romantic .section-title,
+.theme-romantic .ending-section h2 {
+  color: #663f47;
 }
 
 .theme-romantic .small-title,
-.theme-romantic .section-label {
-  color: #a35d6b;
+.theme-romantic .section-label,
+.theme-romantic .date,
+.theme-romantic .info-icon,
+.theme-romantic .ending-heart {
+  color: #b85f73;
 }
 
-.theme-romantic .date {
-  color: #a35d6b;
+.theme-romantic .welcome-text {
+  color: #8c626b;
 }
 
 .theme-romantic .main-photo-wrapper {
   border: 1px solid #dfb5bd;
 }
 
-.theme-romantic .info-card {
-  background: #fff8f9;
+.theme-romantic .info-card,
+.theme-romantic .location-card,
+.theme-romantic .contact-card {
+  background: rgba(255, 247, 249, 0.85);
+
+  border-color: rgba(184, 95, 115, 0.18);
 }
 
-.theme-romantic .info-icon,
-.theme-romantic .ending-heart {
-  color: #b65f70;
+.theme-romantic .info-value,
+.theme-romantic .location-card h3,
+.theme-romantic .contact-name,
+.theme-romantic .ending-names {
+  color: #673f47;
+}
+
+.theme-romantic .info-sub,
+.theme-romantic .location-card p,
+.theme-romantic .contact-phone {
+  color: #92727a;
+}
+
+.theme-romantic .countdown-item {
+  border-color: rgba(184, 95, 115, 0.2);
+
+  background: rgba(255, 247, 249, 0.8);
+}
+
+.theme-romantic .countdown-item strong,
+.theme-romantic .countdown-title {
+  color: #ad5d70;
 }
 
 /* =========================================================
@@ -1521,13 +2014,43 @@ async function copyInvitationLink() {
 ========================================================= */
 
 .theme-minimal {
-  background: #f3f3f0;
+  color: #30302e;
 
-  color: #292929;
+  background: radial-gradient(
+      circle at 15% 10%,
+      rgba(210, 205, 194, 0.25),
+      transparent 30%
+    ),
+    #f3f2ed;
+}
+
+.theme-minimal .invitation {
+  background: #fcfcf9;
 }
 
 .theme-minimal .hero-section {
-  background: #f7f7f4;
+  background: #f7f7f3;
+}
+
+.theme-minimal .couple-names,
+.theme-minimal .section-title,
+.theme-minimal .ending-section h2 {
+  color: #252525;
+}
+
+.theme-minimal .small-title,
+.theme-minimal .section-label {
+  color: #77736c;
+}
+
+.theme-minimal .date,
+.theme-minimal .info-icon,
+.theme-minimal .ending-heart {
+  color: #57554f;
+}
+
+.theme-minimal .welcome-text {
+  color: #77756f;
 }
 
 .theme-minimal .main-photo-wrapper {
@@ -1562,14 +2085,43 @@ async function copyInvitationLink() {
   border-radius: 5px;
 }
 
+.theme-minimal .info-value,
+.theme-minimal .location-card h3,
+.theme-minimal .contact-name,
+.theme-minimal .ending-names {
+  color: #30302e;
+}
+
+.theme-minimal .info-sub,
+.theme-minimal .location-card p,
+.theme-minimal .contact-phone {
+  color: #77756f;
+}
+
+.theme-minimal .countdown-item {
+  border-color: #deddd7;
+
+  background: rgba(255, 255, 255, 0.7);
+}
+
+.theme-minimal .countdown-item strong,
+.theme-minimal .countdown-title {
+  color: #4f4d48;
+}
+
 /* =========================================================
    LUXURY
 ========================================================= */
 
 .theme-luxury {
-  background: #17120f;
+  color: #ead8b5;
 
-  color: #ead0a4;
+  background: radial-gradient(
+      circle at 50% 0%,
+      rgba(184, 145, 75, 0.16),
+      transparent 35%
+    ),
+    #120e0b;
 }
 
 .theme-luxury .top-bar {
@@ -1587,13 +2139,18 @@ async function copyInvitationLink() {
 }
 
 .theme-luxury .invitation {
-  background: #211a16;
+  background: #1d1713;
 
   box-shadow: 0 30px 100px rgba(0, 0, 0, 0.5);
 }
 
 .theme-luxury .hero-section {
-  background: radial-gradient(circle at center, #45352a, #211a16);
+  background: radial-gradient(
+      circle at 50% 35%,
+      rgba(104, 77, 44, 0.42),
+      transparent 45%
+    ),
+    linear-gradient(145deg, #34271e, #17110d);
 }
 
 .theme-luxury .small-title,
@@ -1641,7 +2198,99 @@ async function copyInvitationLink() {
   color: #d6b47c;
 }
 
+.theme-luxury .couple-names,
+.theme-luxury .section-title,
+.theme-luxury .ending-section h2 {
+  color: #f0d8a8;
+}
+
+.theme-luxury .info-value,
+.theme-luxury .location-card h3,
+.theme-luxury .contact-name,
+.theme-luxury .ending-names {
+  color: #ead3a3;
+}
+
+.theme-luxury .info-sub,
+.theme-luxury .location-card p,
+.theme-luxury .contact-phone {
+  color: #bca989;
+}
+
+.theme-luxury .countdown-item {
+  border-color: rgba(216, 181, 111, 0.3);
+
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.theme-luxury .countdown-item strong,
+.theme-luxury .countdown-title {
+  color: #d8b56f;
+}
+
 .theme-luxury .share-button {
+  background: #c9a76b;
+
+  color: #211a16;
+}
+
+/* =========================================================
+   BUTTON COLORS
+========================================================= */
+
+.theme-elegant .sharing-buttons button,
+.theme-elegant .map-buttons button {
+  color: #a97045;
+}
+
+.theme-romantic .sharing-buttons button,
+.theme-romantic .map-buttons button {
+  color: #ad5d70;
+}
+
+.theme-minimal .sharing-buttons button,
+.theme-minimal .map-buttons button {
+  color: #4f4d48;
+}
+
+.theme-luxury .sharing-buttons button,
+.theme-luxury .map-buttons button {
+  color: #d8b56f;
+}
+
+/* =========================================================
+   MUSIC COLORS
+========================================================= */
+
+.theme-romantic .music-button {
+  color: #ad5d70;
+
+  border-color: rgba(173, 93, 112, 0.25);
+}
+
+.theme-romantic .music-icon {
+  background: #ad5d70;
+}
+
+.theme-minimal .music-button {
+  color: #4f4d48;
+
+  border-color: rgba(79, 77, 72, 0.2);
+}
+
+.theme-minimal .music-icon {
+  background: #4f4d48;
+}
+
+.theme-luxury .music-button {
+  color: #d8b56f;
+
+  background: rgba(30, 23, 18, 0.94);
+
+  border-color: rgba(216, 181, 111, 0.25);
+}
+
+.theme-luxury .music-icon {
   background: #c9a76b;
 
   color: #211a16;
@@ -1663,7 +2312,7 @@ async function copyInvitationLink() {
   }
 
   .hero-section {
-    min-height: 680px;
+    min-height: 700px;
 
     padding: 70px 20px;
   }
@@ -1699,6 +2348,23 @@ async function copyInvitationLink() {
   .social-list {
     grid-template-columns: 1fr;
   }
+
+  .countdown {
+    gap: 8px;
+  }
+
+  .countdown-item {
+    padding: 15px 7px;
+  }
+
+  .countdown-item strong {
+    font-size: 27px;
+  }
+
+  .countdown-item span {
+    font-size: 8px;
+    letter-spacing: 1px;
+  }
 }
 
 @media (max-width: 500px) {
@@ -1718,8 +2384,39 @@ async function copyInvitationLink() {
     letter-spacing: 2px;
   }
 
+  .music-button {
+    right: 15px;
+    bottom: 15px;
+
+    min-height: 48px;
+
+    padding: 8px 12px;
+
+    gap: 7px;
+  }
+
+  .music-icon {
+    width: 27px;
+    height: 27px;
+  }
+
+  .music-text {
+    font-size: 9px;
+  }
+
+  .music-waves {
+    display: none;
+  }
+
+  .music-error {
+    right: 15px;
+    bottom: 72px;
+
+    max-width: 240px;
+  }
+
   .hero-section {
-    min-height: 620px;
+    min-height: 650px;
 
     padding: 55px 15px;
   }
@@ -1768,350 +2465,37 @@ async function copyInvitationLink() {
   .ending-names {
     font-size: 23px;
   }
-}
-/* =========================================================
-   ✨ BEAUTIFUL TEXT & COLOR POLISH
-========================================================= */
 
-/* Umumiy matnlar */
-.invitation-page {
-  color: #3d332d;
-}
+  .countdown-wrapper {
+    margin-top: 30px;
+  }
 
-.invitation-page h1,
-.invitation-page h2,
-.invitation-page h3 {
-  color: #3d332d;
-}
+  .countdown-title {
+    font-size: 8px;
 
-.invitation-page p {
-  color: #766c65;
-}
+    letter-spacing: 2px;
+  }
 
-/* =========================================================
-   🤎 ELEGANT
-========================================================= */
+  .countdown {
+    gap: 5px;
+  }
 
-.theme-elegant {
-  color: #46382f;
+  .countdown-item {
+    padding: 12px 4px;
 
-  background: radial-gradient(
-      circle at 10% 5%,
-      rgba(205, 163, 125, 0.18),
-      transparent 30%
-    ),
-    linear-gradient(180deg, #faf6f1 0%, #f5eee7 100%);
-}
+    border-radius: 12px;
+  }
 
-.theme-elegant .invitation {
-  background: #fffdfa;
-}
+  .countdown-item strong {
+    font-size: 23px;
+  }
 
-.theme-elegant .hero-section {
-  background: radial-gradient(
-      circle at 50% 35%,
-      rgba(255, 255, 255, 0.95),
-      transparent 45%
-    ),
-    linear-gradient(145deg, #fffdf9, #f3e4d5);
-}
+  .countdown-item span {
+    margin-top: 6px;
 
-.theme-elegant .couple-names,
-.theme-elegant .section-title,
-.theme-elegant .ending-section h2 {
-  color: #49382e;
-}
+    font-size: 7px;
 
-.theme-elegant .small-title,
-.theme-elegant .section-label,
-.theme-elegant .date,
-.theme-elegant .info-icon,
-.theme-elegant .ending-heart {
-  color: #b47b50;
-}
-
-.theme-elegant .welcome-text {
-  color: #806f61;
-}
-
-.theme-elegant .info-card,
-.theme-elegant .location-card,
-.theme-elegant .contact-card {
-  background: rgba(255, 250, 245, 0.8);
-
-  border-color: rgba(180, 123, 80, 0.18);
-}
-
-.theme-elegant .info-value,
-.theme-elegant .location-card h3,
-.theme-elegant .contact-name,
-.theme-elegant .ending-names {
-  color: #49382e;
-}
-
-.theme-elegant .info-sub,
-.theme-elegant .location-card p,
-.theme-elegant .contact-phone {
-  color: #887b70;
-}
-
-/* =========================================================
-   🌸 ROMANTIC
-========================================================= */
-
-.theme-romantic {
-  color: #63434a;
-
-  background: radial-gradient(
-      circle at 10% 5%,
-      rgba(224, 164, 177, 0.22),
-      transparent 30%
-    ),
-    linear-gradient(180deg, #fff9fa 0%, #f9eaed 100%);
-}
-
-.theme-romantic .invitation {
-  background: #fffdfd;
-}
-
-.theme-romantic .hero-section {
-  background: radial-gradient(
-      circle at 50% 35%,
-      rgba(255, 255, 255, 0.9),
-      transparent 45%
-    ),
-    linear-gradient(145deg, #fffafb, #f4dadd);
-}
-
-.theme-romantic .couple-names,
-.theme-romantic .section-title,
-.theme-romantic .ending-section h2 {
-  color: #663f47;
-}
-
-.theme-romantic .small-title,
-.theme-romantic .section-label,
-.theme-romantic .date,
-.theme-romantic .info-icon,
-.theme-romantic .ending-heart {
-  color: #b85f73;
-}
-
-.theme-romantic .welcome-text {
-  color: #8c626b;
-}
-
-.theme-romantic .info-card,
-.theme-romantic .location-card,
-.theme-romantic .contact-card {
-  background: rgba(255, 247, 249, 0.85);
-
-  border-color: rgba(184, 95, 115, 0.18);
-}
-
-.theme-romantic .info-value,
-.theme-romantic .location-card h3,
-.theme-romantic .contact-name,
-.theme-romantic .ending-names {
-  color: #673f47;
-}
-
-.theme-romantic .info-sub,
-.theme-romantic .location-card p,
-.theme-romantic .contact-phone {
-  color: #92727a;
-}
-
-/* =========================================================
-   🤍 MINIMAL
-========================================================= */
-
-.theme-minimal {
-  color: #30302e;
-
-  background: radial-gradient(
-      circle at 15% 10%,
-      rgba(210, 205, 194, 0.25),
-      transparent 30%
-    ),
-    #f3f2ed;
-}
-
-.theme-minimal .invitation {
-  background: #fcfcf9;
-}
-
-.theme-minimal .hero-section {
-  background: #f7f7f3;
-}
-
-.theme-minimal .couple-names,
-.theme-minimal .section-title,
-.theme-minimal .ending-section h2 {
-  color: #252525;
-}
-
-.theme-minimal .small-title,
-.theme-minimal .section-label {
-  color: #77736c;
-}
-
-.theme-minimal .date,
-.theme-minimal .info-icon,
-.theme-minimal .ending-heart {
-  color: #57554f;
-}
-
-.theme-minimal .welcome-text {
-  color: #77756f;
-}
-
-.theme-minimal .info-card,
-.theme-minimal .location-card,
-.theme-minimal .contact-card {
-  background: #ffffff;
-
-  border-color: #deddd7;
-}
-
-.theme-minimal .info-value,
-.theme-minimal .location-card h3,
-.theme-minimal .contact-name,
-.theme-minimal .ending-names {
-  color: #30302e;
-}
-
-.theme-minimal .info-sub,
-.theme-minimal .location-card p,
-.theme-minimal .contact-phone {
-  color: #77756f;
-}
-
-/* =========================================================
-   🥂 LUXURY
-========================================================= */
-
-.theme-luxury {
-  color: #ead8b5;
-
-  background: radial-gradient(
-      circle at 50% 0%,
-      rgba(184, 145, 75, 0.16),
-      transparent 35%
-    ),
-    #120e0b;
-}
-
-.theme-luxury .invitation {
-  background: #1d1713;
-}
-
-.theme-luxury .hero-section {
-  background: radial-gradient(
-      circle at 50% 35%,
-      rgba(104, 77, 44, 0.42),
-      transparent 45%
-    ),
-    linear-gradient(145deg, #34271e, #17110d);
-}
-
-.theme-luxury .couple-names,
-.theme-luxury .section-title,
-.theme-luxury .ending-section h2 {
-  color: #f0d8a8;
-}
-
-.theme-luxury .small-title,
-.theme-luxury .section-label,
-.theme-luxury .date,
-.theme-luxury .info-icon,
-.theme-luxury .ending-heart {
-  color: #d8b56f;
-}
-
-.theme-luxury .welcome-text {
-  color: #c8b28f;
-}
-
-.theme-luxury .info-card,
-.theme-luxury .location-card,
-.theme-luxury .contact-card {
-  background: rgba(255, 255, 255, 0.025);
-
-  border-color: rgba(216, 181, 111, 0.22);
-}
-
-.theme-luxury .info-value,
-.theme-luxury .location-card h3,
-.theme-luxury .contact-name,
-.theme-luxury .ending-names {
-  color: #ead3a3;
-}
-
-.theme-luxury .info-sub,
-.theme-luxury .location-card p,
-.theme-luxury .contact-phone {
-  color: #bca989;
-}
-
-/* =========================================================
-   BUTTON COLORS
-========================================================= */
-
-.theme-elegant .sharing-buttons button,
-.theme-elegant .map-buttons button {
-  color: #a97045;
-}
-
-.theme-romantic .sharing-buttons button,
-.theme-romantic .map-buttons button {
-  color: #ad5d70;
-}
-
-.theme-minimal .sharing-buttons button,
-.theme-minimal .map-buttons button {
-  color: #4f4d48;
-}
-
-.theme-luxury .sharing-buttons button,
-.theme-luxury .map-buttons button {
-  color: #d8b56f;
-}
-
-/* =========================================================
-   SOFT HOVER
-========================================================= */
-
-.info-card,
-.location-card,
-.contact-card,
-.social-list button,
-.sharing-buttons button {
-  transition: transform 0.25s ease, box-shadow 0.25s ease, background 0.25s ease,
-    border-color 0.25s ease;
-}
-
-.info-card:hover,
-.location-card:hover,
-.contact-card:hover {
-  transform: translateY(-3px);
-}
-
-.theme-elegant .info-card:hover,
-.theme-elegant .location-card:hover,
-.theme-elegant .contact-card:hover {
-  box-shadow: 0 15px 35px rgba(130, 85, 50, 0.08);
-}
-
-.theme-romantic .info-card:hover,
-.theme-romantic .location-card:hover,
-.theme-romantic .contact-card:hover {
-  box-shadow: 0 15px 35px rgba(170, 80, 100, 0.1);
-}
-
-.theme-luxury .info-card:hover,
-.theme-luxury .location-card:hover,
-.theme-luxury .contact-card:hover {
-  box-shadow: 0 15px 35px rgba(216, 181, 111, 0.08);
+    letter-spacing: 0.5px;
+  }
 }
 </style>

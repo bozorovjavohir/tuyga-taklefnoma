@@ -29,6 +29,9 @@ export interface Invitation {
   telegramUrl: string;
   facebookUrl: string;
   tiktokUrl: string;
+
+  // 🎵 Taklifnoma musiqasi
+  musicUrl: string;
 }
 
 const STORAGE_KEY = "taklifnoma";
@@ -61,6 +64,9 @@ const defaultInvitation: Invitation = {
   telegramUrl: "",
   facebookUrl: "",
   tiktokUrl: "",
+
+  // 🎵 Taklifnoma musiqasi
+  musicUrl: "/music/toy.mp3",
 };
 
 export const useInvitationStore = defineStore("invitation", {
@@ -134,6 +140,10 @@ export const useInvitationStore = defineStore("invitation", {
           ...parsed,
 
           gallery: Array.isArray(parsed.gallery) ? parsed.gallery : [],
+
+          // Eski LocalStorage ma'lumotlarida musicUrl bo'lmasa
+          // bo'sh qiymat ishlatiladi
+          musicUrl: typeof parsed.musicUrl === "string" ? parsed.musicUrl : "",
         });
 
         /**
