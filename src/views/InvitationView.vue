@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref } from "vue";
+import { computed, onMounted, onUnmounted, ref, watch } from "vue";
 import { storeToRefs } from "pinia";
 import { useRouter } from "vue-router";
 
@@ -37,44 +37,117 @@ const audio = ref<HTMLAudioElement | null>(null);
 const isPlaying = ref(false);
 const musicError = ref(false);
 
-function toggleMusic() {
-  if (!audio.value || !musicUrl.value) {
+/*
+  Musiqani yaratish
+*/
+function setupAudio(url: string) {
+  // Eski audio bo'lsa to'xtatamiz
+  if (audio.value) {
+    audio.value.pause();
+
+    audio.value.src = "";
+
+    audio.value = null;
+  }
+
+  isPlaying.value = false;
+  musicError.value = false;
+
+  if (!url) {
+    return;
+  }
+
+  console.log("Musiqa yuklanmoqda:", url);
+
+  const player = new Audio();
+
+  player.src = url;
+  player.preload = "auto";
+  player.loop = true;
+  player.volume = 0.6;
+  player.muted = false;
+
+  // Audio xatosini kuzatamiz
+  player.addEventListener("error", () => {
+    console.error("Audio faylni yuklashda xato:", player.error);
+
+    musicError.value = true;
+    isPlaying.value = false;
+  });
+
+  // Musiqa to'xtatilsa
+  player.addEventListener("pause", () => {
+    isPlaying.value = false;
+  });
+
+  // Musiqa ijro qilinsa
+  player.addEventListener("play", () => {
+    isPlaying.value = true;
+    musicError.value = false;
+  });
+
+  audio.value = player;
+
+  // Audio faylni oldindan yuklashga harakat qilamiz
+  player.load();
+}
+
+/*
+  musicUrl o'zgarsa ham audio qayta yaratiladi.
+  Bu LocalStorage bilan ishlaganda juda muhim.
+*/
+watch(
+  musicUrl,
+  (newUrl) => {
+    setupAudio(newUrl);
+  },
+  {
+    immediate: true,
+  }
+);
+
+/*
+  Play / Pause
+*/
+async function toggleMusic() {
+  if (!musicUrl.value) {
+    console.error("musicUrl mavjud emas");
+
+    return;
+  }
+
+  // Agar audio hali yaratilmagan bo'lsa
+  if (!audio.value) {
+    setupAudio(musicUrl.value);
+  }
+
+  if (!audio.value) {
     return;
   }
 
   if (isPlaying.value) {
     audio.value.pause();
-    isPlaying.value = false;
-  } else {
-    audio.value
-      .play()
-      .then(() => {
-        isPlaying.value = true;
-        musicError.value = false;
-      })
-      .catch((error) => {
-        console.error("Musiqani ishga tushirib bo'lmadi:", error);
-        musicError.value = true;
-        isPlaying.value = false;
-      });
-  }
-}
 
-function handleAudioEnded() {
-  if (!audio.value) {
+    isPlaying.value = false;
+
     return;
   }
 
-  audio.value.currentTime = 0;
+  try {
+    console.log("Musiqa ishga tushmoqda...");
 
-  audio.value
-    .play()
-    .then(() => {
-      isPlaying.value = true;
-    })
-    .catch(() => {
-      isPlaying.value = false;
-    });
+    await audio.value.play();
+
+    isPlaying.value = true;
+    musicError.value = false;
+
+    console.log("Musiqa ishga tushdi!");
+  } catch (error) {
+    console.error("Musiqani ishga tushirib bo'lmadi:", error);
+
+    isPlaying.value = false;
+    musicError.value = true;
+  }
 }
 
 /* =========================================================
@@ -123,35 +196,37 @@ function updateCountdown() {
 
   countdown.value = {
     days: Math.floor(difference / (1000 * 60 * 60 * 24)),
+
     hours: Math.floor((difference / (1000 * 60 * 60)) % 24),
+
     minutes: Math.floor((difference / (1000 * 60)) % 60),
+
     seconds: Math.floor((difference / 1000) % 60),
   };
 }
+
+/* =========================================================
+   MOUNT / UNMOUNT
+========================================================= */
 
 onMounted(() => {
   updateCountdown();
 
   countdownInterval = setInterval(updateCountdown, 1000);
-
-  if (musicUrl.value) {
-    audio.value = new Audio(musicUrl.value);
-    audio.value.loop = true;
-    audio.value.volume = 0.6;
-
-    audio.value.addEventListener("ended", handleAudioEnded);
-  }
 });
 
 onUnmounted(() => {
   if (countdownInterval) {
     clearInterval(countdownInterval);
+
     countdownInterval = null;
   }
 
   if (audio.value) {
     audio.value.pause();
-    audio.value.removeEventListener("ended", handleAudioEnded);
+
+    audio.value.src = "";
+
     audio.value = null;
   }
 });
@@ -265,6 +340,7 @@ function editInvitation() {
 
 function createNextInvitation() {
   invitationStore.reset();
+
   router.push("/create");
 }
 
@@ -358,6 +434,7 @@ Sizni baxtli kunimizda kutib qolamiz! ❤️`;
 
 function shareTelegram() {
   const text = encodeURIComponent(invitationText.value);
+
   const url = encodeURIComponent(window.location.href);
 
   const telegramUrl = `https://t.me/share/url?url=${url}&text=${text}`;
